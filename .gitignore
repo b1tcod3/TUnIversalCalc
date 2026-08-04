@@ -1,0 +1,11 @@
+# Binario compilado
+/tuniversalcalc
+
+# Archivos de entorno
+.env
+.env.*
+
+# Editor
+.idea/
+.vscode/
+*.swp
