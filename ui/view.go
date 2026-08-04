@@ -1,30 +1,35 @@
 package ui
 
 import (
-	"fmt"
-
 	"github.com/charmbracelet/lipgloss"
 )
 
-// View dibuja la interfaz en la terminal
 func (m Model) View() string {
-	header := titleStyle.Render("TUnIversarlCalc - Motor Matemático")
+	// 1. Etiqueta de la aplicación: [ TUnIversarlCalc ]
+	brand := brandStyle.Render("TUnIversarlCalc")
 
-	// Dibujamos la sugerencia de comando si existe
-	suggestionBox := ""
+	// 2. El símbolo de inicio de línea (verde)
+	prompt := promptStyle.Render("❯")
+
+	// 3. La caja de texto interactiva
+	inputLine := m.TextInput.View()
+
+	// 4. La sugerencia inline (gris) pegada al input
+	suggest := ""
 	if m.Suggest != "" {
-		suggestionBox = "\nSugerencia: " + cmdStyle.Render(m.Suggest+" (Presiona Enter para completar)")
+		suggest = suggestStyle.Render("→ " + m.Suggest)
 	}
-	// Mostramos tanto la expresión actual como el último resultado
-	// EL DETALLE CLAVE:
-	// Asegúrate de llamar a m.TextInput.View() para renderizar la caja de texto con su contenido
-	body := fmt.Sprintf(
-		"\n%s%s\n\nResultado: %s\n\n(Esc: Salir)",
-		m.TextInput.View(), // ESTA ES LA LÍNEA QUE DIBUJA EL TEXTO Y EL CURSOR
-		suggestionBox,
-		m.Result,
-	)
-	ui := lipgloss.JoinVertical(lipgloss.Left, header, body)
 
-	return appStyle.Render(ui) + "\n"
+	// 5. El resultado a la derecha
+	resultStr := ""
+	if m.Result != "" {
+		resultStr = resultStyle.Render(m.Result)
+	}
+
+	// -- CONSTRUCCIÓN FINAL HORIZONTAL --
+	// Juntamos todo en una sola línea principal
+	mainLine := lipgloss.JoinHorizontal(lipgloss.Top, brand, prompt, inputLine, suggest, resultStr)
+
+	// Le damos un poco de respiro por arriba y abajo
+	return "\n" + mainLine + "\n\n" + infoStyle.Render("Esc/Ctrl+C para salir | Enter para evaluar") + "\n"
 }

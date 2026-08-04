@@ -6,42 +6,54 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// -- ESTILOS (Lipgloss) --
-
+// -- ESTILOS MINIMALISTAS TIPO BARRAS --
 var (
-	// Estilo para la caja principal de la aplicación
-	appStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62")). // Color violeta/azulado
-			Padding(1, 2).
-			Width(60)
+	// Etiqueta principal (TUnIversarlCalc) - Fondo morado, texto blanco
+	brandStyle = lipgloss.NewStyle().
+		Background(lipgloss.Color("62")).
+		Foreground(lipgloss.Color("255")).
+		Padding(0, 1).
+		MarginRight(1).
+		Bold(true)
 
-	// Estilo para título
-	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205")). // rosa
-			Bold(true)
+	// Etiqueta de símbolo/estado (ej: "❯")
+	promptStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("42")). // Verde
+		MarginRight(1).
+		Bold(true)
 
-	// Estilo para el Input
-	cmdStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("42")) // verde
+	// Sugerencias inline
+	suggestStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")). // Gris oscuro
+		Italic(true)
+
+	// Resultado del cálculo (a la derecha o debajo)
+	resultStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("220")). // Amarillo/Naranja
+		MarginLeft(2)
+
+	// Estilo para errores o mensajes de sistema
+	infoStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("244")).
+		MarginLeft(2)
 )
 
-// modelo que representa el  estado de la interfaz
 type Model struct {
-	TextInput textinput.Model // componente robusto de entrada
+	TextInput textinput.Model
 	Input     string
 	Result    string
-	Suggest   string // sugerencia de comando
+	Suggest   string
 }
 
-// NewModel es el constructor que llamara aplicación
 func NewModel() Model {
-	// configuramos el componente de entrada de textinput
 	ti := textinput.New()
-	ti.Placeholder = "Escribe un comando..."
+	ti.Placeholder = "ej. /integral x^2"
 	ti.Focus()
 	ti.CharLimit = 150
-	ti.Width = 50
+	ti.Width = 50 // Ajustamos el ancho para que quepa en una línea
+
+	// Ya no necesitamos el prompt interno del textinput, usaremos el nuestro (❯)
+	ti.Prompt = ""
 
 	return Model{
 		TextInput: ti,
@@ -50,7 +62,6 @@ func NewModel() Model {
 	}
 }
 
-// Init arranca los comandos iniciales de bubble tea
 func (m Model) Init() tea.Cmd {
 	return textinput.Blink
 }
