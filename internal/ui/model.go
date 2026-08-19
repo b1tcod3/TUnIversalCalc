@@ -51,6 +51,12 @@ type Model struct {
 	history   []string
 	histIdx   int
 	outputLog []LogEntry
+
+	// Variables definidas por el usuario: la expresión del panel 1 se
+	// guarda como "f" al pulsar Enter (mapa listo para g, h, ...).
+	vars      map[string]string
+	exprValid bool
+	tabHinted bool
 }
 
 func NewModel() Model {
@@ -73,10 +79,11 @@ func NewModel() Model {
 		output:    output,
 		focus:     FocusExpr,
 		histIdx:   -1,
+		vars:      map[string]string{},
 		outputLog: []LogEntry{
 			{Level: LevelInfo, Content: "Bienvenido a TUnIversalCalc"},
-			{Level: LevelInfo, Content: "Escribe una expresión y un comando, luego Enter."},
-			{Level: LevelInfo, Content: "Tab cambia de panel • Shift+Tab salta campos"},
+			{Level: LevelInfo, Content: "1. Escribe una expresión y pulsa Enter: se guardará como f."},
+			{Level: LevelInfo, Content: "2. Úsala en el panel de comandos: /integral f, /derivar f"},
 		},
 	}
 	m.output.SetContent(m.renderLog())
