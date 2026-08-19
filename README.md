@@ -4,11 +4,15 @@ Calculadora TUI (interfaz de texto) en **Go** con **Bubble Tea**, construida con
 
 ## Características
 
-- Interfaz de terminal interactiva con estilo propio (bordes y colores vía Lipgloss)
-- Entrada de comandos con **autocompletado** de sugerencias (`/integral`, `/derivada`, `/matriz`)
-- Arquitectura Elm: estado centralizado (`Model`), mensajes (`Msg`) y renderizado declarativo
-- Modo de pantalla alterna (`AltScreen`) que no ensucia el historial de tu terminal
-- Motor matemático (`engine`) preparado para el analizador (lexer/parser) de expresiones
+- **Interfaz de paneles divididos** (Grid con Lipgloss):
+  - Panel 1 arriba-izquierda: expresión matemática (`ƒ(x) = x^2 + 3x - 5`)
+  - Panel 2 abajo-izquierda: operación/comando (`/integral`, `/derivar`, ...)
+  - Panel 3 derecha: salida paso a paso con scroll y colores por nivel
+- **Plantillas editables** con campos saltables: `/int` autocompleta a `integral( ?, ?, dx )` y `Shift+Tab` recorre los campos (estilo snippets)
+- **Renderizado matemático Unicode**: `x^2 → x²`, `sqrt → √`, `pi → π`, `* → ·`, `- → −`, superíndices y subíndices
+- Arquitectura Elm real: motor asíncrono vía `tea.Cmd` + `ResultMsg` (la UI no conoce el cálculo)
+- Redimensionamiento dinámico (`tea.WindowSizeMsg`), historial de comandos con `↑/↓`, estilos inmutables (sin mutación de globales en `View()`)
+- Motor matemático (`engine`) con interfaz async lista para el parser real (Pratt)
 
 ## Requisitos
 
@@ -25,39 +29,47 @@ go mod download
 ## Uso
 
 ```bash
-go run main.go
+go run ./cmd/tuniversalcalc
 ```
 
 ### Controles
 
-| Tecla        | Acción                          |
-| ------------ | ------------------------------- |
-| `Enter`      | Ejecuta / autocompleta comando  |
-| `Tab`        | Autocompleta sugerencia         |
-| `Esc` / `Ctrl+C` | Salir de la aplicación      |
+| Tecla            | Acción                                |
+| ---------------- | ------------------------------------- |
+| `Tab`            | Cambiar entre panel Expresión/Comando |
+| `Shift+Tab`      | Saltar al siguiente campo de plantilla |
+| `Enter`          | Insertar plantilla / evaluar cálculo  |
+| `↑` / `↓`        | Historial de comandos (panel 2)       |
+| `PgUp` / `PgDn`  | Scroll del panel de salida            |
+| `Esc` / `Ctrl+C` | Salir de la aplicación                |
 
-### Comandos
+### Comandos (con autocompletado por prefijo)
 
-Escribe `/` seguido del nombre para ver las sugerencias disponibles:
+Escribe `/` + 3 letras para autocompletar la plantilla y luego `Shift+Tab` para recorrer los campos `?`:
 
-- `/integral` — cálculo de integrales
-- `/derivada` — cálculo de derivadas
-- `/matriz` — operaciones con matrices
+- `/integral` — `integral( ?, ?, dx )` — integral definida/indefinida
+- `/derivar` — `derivar( ?, ? )` — derivada de f(x) respecto a la variable
+- `/limite` — `limite( x, ?, ? )` — límite de f(x) cuando x → valor
+- `/resolver` — `resolver( ?, ? )` — resolver ecuación para la variable
+- `/simplificar` — `simplificar( ? )` — simplificar expresión
+- `/matriz` — `matriz( [[?, ?],[?, ?]] )` — operaciones con matrices
 
 ## Estructura del proyecto
 
 ```
 .
-├── main.go         # Punto de entrada (bootstrap de Bubble Tea)
-├── engine/         # Motor matemático (evaluación de expresiones)
-└── ui/             # Interfaz de usuario (Model, Update, View)
+├── cmd/tuniversalcalc/     # Punto de entrada (bootstrap de Bubble Tea)
+└── internal/
+    ├── ui/                 # Interfaz: model, update, view, styles, templates, messages
+    ├── engine/             # Motor matemático (stub simbólico async)
+    └── render/             # Renderizado Unicode (superíndices, ∫, √, π, ∞)
 ```
 
 ## Stack tecnológico
 
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea) — framework TUI basado en la arquitectura Elm
-- [Lipgloss](https://github.com/charmbracelet/lipgloss) — estilos y composición de la interfaz
-- [Bubbles](https://github.com/charmbracelet/bubbles) — componentes reutilizables (textinput)
+- [Lipgloss](https://github.com/charmbracelet/lipgloss) — estilos y composición de la interfaz (grid de paneles)
+- [Bubbles](https://github.com/charmbracelet/bubbles) — componentes reutilizables (textinput, viewport)
 
 ## Licencia
 

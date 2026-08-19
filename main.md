@@ -1,8 +1,11 @@
 # main.go
 
-Es el punto de entrada de la arquitectura Elm
+Es el punto de entrada de la arquitectura Elm.
 
-Crea un archivo llamado main.go en la raíz de tu proyecto tuniversarlcalc y pega el siguiente código. Este es el boilerplate funcional que dibuja la caja, captura las teclas y maneja el estado de forma reactiva.
+El archivo vive en `cmd/tuniversalcalc/main.go` (estructura estándar Go: el código
+de la aplicación va en `internal/` y el binario se construye desde `cmd/`).
+
+Crea un archivo llamado main.go en cmd/tuniversalcalc/ de tu proyecto tuniversalcalc y pega el siguiente código. Este es el boilerplate funcional que dibuja la caja, captura las teclas y maneja el estado de forma reactiva.
 
 Código Base (main.go)
 
@@ -32,7 +35,7 @@ import (
 
 - os: Paquete estándar para interactuar con el sistema operativo. Se usa os.Exit(1) para salir con un código de error.
 
-- "tuniversalcalc/ui": Paquete propio del proyecto.
+- "tuniversalcalc/internal/ui": Paquete propio del proyecto.
 
 - tea "github.com/charmbracelet/bubbletea": La librería Bubble Tea, importada con el alias tea. Proporciona el runtime que ejecuta el bucle principal de la arquitectura Elm.
 
