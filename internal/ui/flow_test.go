@@ -78,8 +78,8 @@ func TestValidate(t *testing.T) {
 		{"3**2", false},
 		{"3*-2", true},
 		{"-2x^2", true},
-		{"x^ -2", false},
-		{"x^-2", false},
+		{"x^ -2", true}, // exponente negativo: ahora el parser lo soporta
+		{"x^-2", true},  // exponente negativo: ahora el parser lo soporta
 		{"2x + y/c", true},
 		{"3.5x", true},
 		{"a@b", false},

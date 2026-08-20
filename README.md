@@ -22,7 +22,8 @@ Calculadora TUI (interfaz de texto) en **Go** con **Bubble Tea**, construida con
 - **Renderizado matemático Unicode**: `x^2 → x²`, `sqrt → √`, `pi → π`, `* → ·`, `- → −`, superíndices y subíndices
 - Arquitectura Elm real: motor asíncrono vía `tea.Cmd` + `ResultMsg` (la UI no conoce el cálculo)
 - Redimensionamiento dinámico (`tea.WindowSizeMsg`), historial de comandos con `↑/↓`, estilos inmutables (sin mutación de globales en `View()`)
-- Motor matemático (`engine`) con interfaz async lista para el parser real (Pratt)
+- **Motor simbólico real**: parser Pratt (lexer + AST) con precedencias, multiplicación implícita (`2x`, `x^(2y)`), paréntesis y errores con posición. Las operaciones trabajan sobre el árbol y muestran las reglas aplicadas paso a paso
+- **Operaciones simbólicas**: derivada (suma, producto, cociente, potencia y cadena para `sqrt/sin/cos/abs`), simplificación (términos semejantes, `x·x → x²`), resolución de ecuaciones lineales y cuadráticas (Δ) y límites por sustitución con L'Hôpital (0/0 o ∞/∞) e infinitos polinómicos. Integrales término a término (polinomios, `sin/cos`, `1/x → ln|x|`, `√x`). Lo no soportado da un stub explícito (p. ej. `/matriz`, `x^x`, `∫x·sin(x) dx`)
 
 ## Requisitos
 
@@ -56,8 +57,8 @@ go run ./cmd/tuniversalcalc
 ### Uso (flujo)
 
 1. En el panel 1 declara un objeto con slash-command y pulsa **Enter**: `/ecuacion 2x+2=0`, `/funcion 2x+2` o `/expresion x^2+1`. Se registra con auto-nombre (`e1`, `f1`, `p1`...) y el foco salta al panel 2.
-2. En el panel 2 escribe la operación, citando el objeto o dejando que use el último: `/resolver x`, `/resolver e1 x`, `/integral e1`, `/derivar f1`.
-3. La salida paso a paso (con LaTeX emulado, Unicode y errores claros) aparece en el panel derecho.
+2. En el panel 2 escribe la operación, citando el objeto o dejando que use el último: `/resolver x`, `/resolver e1 x`, `/integral e1`, `/derivar f1`, `/simplificar p1`, `/limite f1 2` o `/limite f1 x inf`.
+3. La salida paso a paso (con LaTeX emulado, Unicode y errores claros) aparece en el panel derecho. Ejemplo real: `/derivar f1` con `f1 = x^2+3x-5` muestra las reglas de la suma y la potencia y termina con `f1′(x) = 2x + 3`; `/resolver x` con `2x+2` da `x = -1`.
 
 El panel 2 permanece bloqueado (⛔) mientras no haya al menos un objeto declarado.
 
@@ -76,7 +77,7 @@ El panel 2 permanece bloqueado (⛔) mientras no haya al menos un objeto declara
 - `/resolver` — `/resolver ? ?` — resolver ecuación para la variable (ej. `/resolver x`, `/resolver e1 x`)
 - `/integral` — `/integral ?` — integral del objeto
 - `/derivar` — `/derivar ?` — derivada del objeto
-- `/limite` — `/limite ?` — límite cuando la variable → valor
+- `/limite` — `/limite ?` — límite cuando la variable → valor (`/limite f1 2`, `/limite f1 x inf`; sin valor se usa 0)
 - `/simplificar` — `/simplificar ?` — simplificar el objeto
 - `/matriz` — `/matriz ?` — operaciones con matrices
 
@@ -87,7 +88,7 @@ El panel 2 permanece bloqueado (⛔) mientras no haya al menos un objeto declara
 ├── cmd/tuniversalcalc/     # Punto de entrada (bootstrap de Bubble Tea)
 └── internal/
     ├── ui/                 # Interfaz: model, update, view, styles, templates, messages
-    ├── engine/             # Motor matemático (stub simbólico async + declaraciones)
+    ├── engine/             # Motor simbólico: lexer, parser Pratt (AST), derivada/simplificar/resolver/integral/límite
     └── render/             # Renderizado Unicode y LaTeX emulado (superíndices, ∫, √, π, ∞)
 ```
 

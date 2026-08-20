@@ -32,7 +32,8 @@ func expandPowersLatex(s string) string {
 	return b.String()
 }
 
-// exponentLatex extrae el exponente tras '^': token simple o grupo (...).
+// exponentLatex extrae el exponente tras '^': token simple (signo seguido
+// de alfanumérico) o grupo (...).
 func exponentLatex(s string, start int) (string, int) {
 	if start >= len(s) {
 		return "", start
@@ -42,6 +43,9 @@ func exponentLatex(s string, start int) (string, int) {
 		return inner, next
 	}
 	k := start
+	if k < len(s) && (s[k] == '+' || s[k] == '-') {
+		k++
+	}
 	for k < len(s) && isAlnum(s[k]) {
 		k++
 	}

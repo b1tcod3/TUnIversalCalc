@@ -78,7 +78,7 @@ func ParseDecl(raw string) (Decl, error) {
 		if strings.Contains(content, "=") {
 			return Decl{}, fmt.Errorf("una función no lleva '=': /funcion 2x+2")
 		}
-		if err := Validate(content); err != nil {
+		if _, err := ParseExpr(content); err != nil {
 			return Decl{}, err
 		}
 	case strings.HasPrefix(cmd, "expres"):
@@ -86,7 +86,7 @@ func ParseDecl(raw string) (Decl, error) {
 		if strings.Contains(content, "=") {
 			return Decl{}, fmt.Errorf("una expresión no lleva '=': /expresion x^2+1")
 		}
-		if err := Validate(content); err != nil {
+		if _, err := ParseExpr(content); err != nil {
 			return Decl{}, err
 		}
 	default:
@@ -98,17 +98,10 @@ func ParseDecl(raw string) (Decl, error) {
 	return d, nil
 }
 
-// validEquation exige exactamente un '=' con ambos lados válidos.
+// validEquation valida la ecuación con el parser simbólico real.
 func validEquation(content string) error {
-	sides := strings.Split(content, "=")
-	if len(sides) != 2 {
-		return fmt.Errorf("una ecuación necesita exactamente un '=': /ecuacion 2x+2=0")
-	}
-	if err := Validate(sides[0]); err != nil {
-		return fmt.Errorf("lado izquierdo inválido: %v", err)
-	}
-	if err := Validate(sides[1]); err != nil {
-		return fmt.Errorf("lado derecho inválido: %v", err)
+	if _, _, err := ParseEquation(content); err != nil {
+		return err
 	}
 	return nil
 }
