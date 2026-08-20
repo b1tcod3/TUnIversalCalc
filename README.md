@@ -18,7 +18,7 @@ Calculadora TUI (interfaz de texto) en **Go** con **Bubble Tea**, construida con
 - **Objetos nombrados**: cada declaración se registra (`e1`, `f1`, ...) y el comando es *inteligente*: `/resolver x` usa el último objeto, `/resolver e1 x` apunta a uno concreto, y un nombre inexistente da error citando los disponibles
 - **LaTeX emulado**: cada declaración/operación muestra la ecuación en formato LaTeX (`2x^{2} + 3x \cdot 2`) junto a su versión Unicode legible (`2·x² + 3·x·2`)
 - **Validación en vivo**: el panel 1 previsualiza el auto-nombre, el LaTeX y la validez mientras escribes; los errores aparecen en la salida
-- **Plantillas editables** con campos saltables: `/ecu` autocompleta a `/ecuacion ...` y `/res` a `/resolver ...`; `Shift+Tab` recorre los campos (estilo snippets)
+- **Plantillas editables** con campos saltables: paleta de comandos al escribir `/` (lista alfabética con fuzzy match, navegación y Enter para insertar), y `Shift+Tab` recorre los campos (estilo snippets)
 - **Renderizado matemático Unicode**: `x^2 → x²`, `sqrt → √`, `pi → π`, `* → ·`, `- → −`, superíndices y subíndices
 - Arquitectura Elm real: motor asíncrono vía `tea.Cmd` + `ResultMsg` (la UI no conoce el cálculo)
 - Redimensionamiento dinámico (`tea.WindowSizeMsg`), historial de comandos con `↑/↓`, estilos inmutables (sin mutación de globales en `View()`)
@@ -46,11 +46,11 @@ go run ./cmd/tuniversalcalc
 
 | Tecla            | Acción                                |
 | ---------------- | ------------------------------------- |
-| `Tab`            | Cambiar entre panel Declaración/Comando (panel 2 solo con objetos declarados) |
-| `Shift+Tab`      | Saltar al siguiente campo de plantilla |
-| `Enter`          | Insertar plantilla / declarar o evaluar |
-| `↑` / `↓`        | Historial de comandos (panel 2)       |
-| `PgUp` / `PgDn`  | Scroll del panel de salida            |
+| `Tab`            | Cambiar entre panel Declaración/Comando (panel 2 solo con objetos declarados). Con la paleta abierta: bajar en la lista |
+| `Shift+Tab`      | Saltar al siguiente campo de plantilla. Con la paleta abierta: subir en la lista |
+| `↑` / `↓`        | Historial de comandos (panel 2). Con la paleta abierta: mover la selección |
+| `Enter`          | Insertar plantilla / declarar o evaluar. Con la paleta abierta: insertar la seleccionada |
+| `Esc`            | Cerrar la paleta de comandos (si está abierta) o salir |
 | `Esc` / `Ctrl+C` | Salir de la aplicación                |
 
 ### Uso (flujo)
@@ -63,13 +63,13 @@ El panel 2 permanece bloqueado (⛔) mientras no haya al menos un objeto declara
 
 ### Comandos (con autocompletado por prefijo)
 
-Escribe `/` + 3 letras para autocompletar la plantilla y luego `Shift+Tab` para recorrer los campos `?`:
+**Paleta de comandos**: escribe `/` y aparece la lista de comandos del panel en **orden alfabético**, filtrada por **fuzzy match** (`/rslv` → `resolver`, `/fnc` → `funcion`). Navega con `↑`/`↓` (o `Shift+Tab`/`Tab`), confirma con `Enter` (inserta la plantilla y coloca el cursor en el primer campo) y cierra con `Esc`. La lista usa scroll si no cabe en el panel. Si escribes el comando completo a mano (o con argumentos), la paleta se cierra sola.
 
 **Panel 1 — declaración** (auto-nombre: `e1`, `f1`, `p1`...):
 
 - `/ecuacion` — `/ecuacion ?` — ecuación con un `=` (ej. `2x+2=0`)
-- `/funcion` — `/funcion ?` — función sin `=`
 - `/expresion` — `/expresion ?` — expresión sin `=`
+- `/funcion` — `/funcion ?` — función sin `=`
 
 **Panel 2 — operación** (el objeto se puede omitir: se usa el último declarado):
 

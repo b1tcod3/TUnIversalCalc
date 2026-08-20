@@ -31,6 +31,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Paleta abierta: navegar, insertar o cerrar tiene prioridad
+		if m.palette.Open {
+			switch msg.Type {
+			case tea.KeyUp, tea.KeyShiftTab:
+				m.paletteUp()
+				return m, nil
+			case tea.KeyDown, tea.KeyTab:
+				m.paletteDown()
+				return m, nil
+			case tea.KeyEnter:
+				return m.paletteSelect()
+			case tea.KeyEsc:
+				m.closePalette()
+				return m, nil
+			}
+			// Las demás teclas caen al input y refiltran la lista
+		}
+
 		switch msg.Type {
 
 		case tea.KeyCtrlC, tea.KeyEsc:
@@ -86,6 +104,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	} else {
 		m.cmdInput, cmd = m.cmdInput.Update(msg)
 	}
+	m.refreshPalette()
 	return m, cmd
 }
 
@@ -194,6 +213,7 @@ func (m *Model) autoName(t engine.DeclType) string {
 }
 
 func (m Model) switchPanel() Model {
+	m.closePalette() // cambiar de panel cierra la paleta
 	switch m.focus {
 	case FocusDecl:
 		// El panel 2 solo se habilita con al menos un objeto declarado
@@ -323,6 +343,16 @@ func (m *Model) updateLayout() {
 	}
 	m.output.Width = w
 	m.output.Height = h
+
+	// Filas visibles de la paleta: contenido del panel menos título,
+	// blanco e input. 2..7 para que nunca desborde el layout.
+	m.palette.Max = m.leftHeight() - chromeInH - 4
+	if m.palette.Max < 2 {
+		m.palette.Max = 2
+	}
+	if m.palette.Max > 7 {
+		m.palette.Max = 7
+	}
 }
 
 func (m Model) leftWidth() int {
@@ -354,3 +384,5 @@ func (m Model) gridAvailable() int {
 	}
 	return 1
 }
+
+func _init() {}

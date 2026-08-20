@@ -1,15 +1,25 @@
 package ui
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
 	"tuniversalcalc/internal/engine"
 )
 
+// ansiRe quita los códigos de escape CSI (colores, cursor) para medir el
+// ancho real de una línea de la View.
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+func stripANSI(s string) string {
+	return ansiRe.ReplaceAllString(s, "")
+}
+
 // TestViewFitsHeight garantiza que la View nunca desborde la terminal:
 // si lo hiciera, el terminal hace scroll y corta la parte superior
-// (banner incluido). También verifica el ancho de cada línea.
+// (banner incluido). También verifica el ancho de cada línea, ignorando
+// los códigos ANSI. Se comprueba con la paleta abierta en ambos paneles.
 func TestViewFitsHeight(t *testing.T) {
 	for _, size := range [][2]int{{100, 28}, {80, 24}, {60, 20}, {120, 34}} {
 		m := NewModel()
@@ -17,16 +27,37 @@ func TestViewFitsHeight(t *testing.T) {
 		m.updateLayout()
 		m.declInput.SetValue("/funcion 2x+2")
 		m.declValid = true
-		lines := strings.Count(m.View(), "\n") + 1
-		if lines > m.height {
-			t.Errorf("%dx%d: View mide %d líneas, la terminal tiene %d → se corta arriba",
-				size[0], size[1], lines, m.height)
-		}
-		for i, l := range strings.Split(m.View(), "\n") {
-			if w := len([]rune(l)); w > size[0] {
-				t.Errorf("%dx%d: línea %d mide %d columnas (> %d) → se corta a la derecha",
-					size[0], size[1], i+1, w, size[0])
-			}
+		checkView(t, m, size, "normal")
+
+		// Paleta abierta en el panel de declaración ("/" lista todo)
+		m.declInput.SetValue("/")
+		m.refreshPalette()
+		checkView(t, m, size, "paleta-declaracion")
+
+		// Paleta abierta en el panel de comandos
+		m.focus = FocusCmd
+		m.cmdInput.SetValue("/")
+		m.refreshPalette()
+		checkView(t, m, size, "paleta-comando")
+
+		// Sin matches (fragmento roto): paleta cerrada pero sigue el layout
+		m.cmdInput.SetValue("/rslv x")
+		m.refreshPalette()
+		checkView(t, m, size, "sin-match")
+	}
+}
+
+func checkView(t *testing.T, m Model, size [2]int, label string) {
+	t.Helper()
+	lines := strings.Count(m.View(), "\n") + 1
+	if lines > m.height {
+		t.Errorf("%dx%d [%s]: View mide %d líneas, la terminal tiene %d → se corta arriba",
+			size[0], size[1], label, lines, m.height)
+	}
+	for i, l := range strings.Split(m.View(), "\n") {
+		if w := len([]rune(stripANSI(l))); w > size[0] {
+			t.Errorf("%dx%d [%s]: línea %d mide %d columnas (> %d) → se corta a la derecha",
+				size[0], size[1], label, i+1, w, size[0])
 		}
 	}
 }

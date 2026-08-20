@@ -4,8 +4,8 @@ import "testing"
 
 func TestParseDecl(t *testing.T) {
 	cases := []struct {
-		in   string
-		err  bool
+		in  string
+		err bool
 	}{
 		{"", true},
 		{"2x+2", true},

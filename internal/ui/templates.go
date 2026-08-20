@@ -13,20 +13,20 @@ type Template struct {
 // Registro de plantillas de OPERACIÓN (panel 2). Los objetos no hacen
 // falta citarlos: si se omite el nombre, se opera sobre el último.
 var opsRegistry = []Template{
-	{Trigger: "resolver", InsertText: "/resolver ? ?", Desc: "Resolver ecuación: objeto (opcional) y variable"},
-	{Trigger: "integral", InsertText: "/integral ?", Desc: "Integral del objeto indicado (o el último)"},
 	{Trigger: "derivar", InsertText: "/derivar ?", Desc: "Derivada del objeto respecto a la variable"},
+	{Trigger: "integral", InsertText: "/integral ?", Desc: "Integral del objeto indicado (o el último)"},
 	{Trigger: "limite", InsertText: "/limite ?", Desc: "Límite cuando la variable → valor"},
-	{Trigger: "simplificar", InsertText: "/simplificar ?", Desc: "Simplificar la expresión del objeto"},
 	{Trigger: "matriz", InsertText: "/matriz ?", Desc: "Operaciones con matrices"},
+	{Trigger: "resolver", InsertText: "/resolver ? ?", Desc: "Resolver ecuación: objeto (opcional) y variable"},
+	{Trigger: "simplificar", InsertText: "/simplificar ?", Desc: "Simplificar la expresión del objeto"},
 }
 
 // Registro de plantillas de DECLARACIÓN (panel 1). Los objetos se nombran
 // solos: /ecuacion 2x+2=0 → e1, /funcion 2x+2 → f1, /expresion x^2 → p1.
 var declRegistry = []Template{
 	{Trigger: "ecuacion", InsertText: "/ecuacion ?", Desc: "Ecuación (auto-e1): ej. 2x+2=0"},
-	{Trigger: "funcion", InsertText: "/funcion ?", Desc: "Función (auto-f1): ej. 2x+2"},
 	{Trigger: "expresion", InsertText: "/expresion ?", Desc: "Expresión (auto-p1): ej. x^2+1"},
+	{Trigger: "funcion", InsertText: "/funcion ?", Desc: "Función (auto-f1): ej. 2x+2"},
 }
 
 // matchTemplate busca una plantilla por prefijo (mínimo 3 caracteres) para

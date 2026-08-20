@@ -62,6 +62,9 @@ type Model struct {
 	counters  map[engine.DeclType]int
 	declValid bool
 	tabHinted bool
+
+	// Selector de comandos al escribir "/" (paleta de auto-completado).
+	palette Palette
 }
 
 func NewModel() Model {

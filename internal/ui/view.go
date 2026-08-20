@@ -26,12 +26,20 @@ func (m Model) View() string {
 		exprStyle = exprPanelActive
 	}
 	exprStyle = exprStyle.Copy().Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
-	exprBody := m.declInput.View() + m.declEchoLine()
+	exprBody := m.declInput.View()
+	if m.palette.Open && m.palette.Anchor == FocusDecl {
+		exprBody += "\n\n" + m.paletteView()
+	} else {
+		exprBody += m.declEchoLine()
+	}
 	panel1 := exprStyle.Render(titleRight(" 1. Declaración ", " Declaración ", colorExprActive, innerL) + "\n\n" + exprBody)
 
 	// --- PANEL 2: CÁLCULO (bloqueado sin objetos declarados) ---
 	calcContent := m.cmdInput.View()
-	if !m.declValid {
+	switch {
+	case m.palette.Open && m.palette.Anchor == FocusCmd:
+		calcContent += "\n\n" + m.paletteView()
+	case !m.declValid:
 		calcContent = hintStyle.Render("⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /ecuacion 2x+2=0 (Enter)")
 	}
 	calcStyle := calcPanelInactive
