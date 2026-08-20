@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"tuniversalcalc/internal/engine"
@@ -38,14 +40,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyTab:
 			return m.switchPanel(), nil
 
-		// Salto de campo dentro de una plantilla
+		// Salto de campo dentro de una plantilla (ambos paneles)
 		case tea.KeyShiftTab:
-			if m.focus != FocusCmd || !HasFields(m.cmdInput.Value()) {
+			var ti *textinput.Model
+			if m.focus == FocusDecl {
+				ti = &m.declInput
+			} else {
+				ti = &m.cmdInput
+			}
+			if !HasFields(ti.Value()) {
 				return m, nil
 			}
-			val, pos := JumpNextField(m.cmdInput.Value(), m.cmdInput.Position())
-			m.cmdInput.SetValue(val)
-			m.cmdInput.SetCursor(pos)
+			val, pos := JumpNextField(ti.Value(), ti.Position())
+			ti.SetValue(val)
+			ti.SetCursor(pos)
 			return m, nil
 
 		case tea.KeyEnter:
@@ -73,9 +81,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Enrutar el mensaje solo al input enfocado (el otro devuelve nil)
 	var cmd tea.Cmd
-	if m.focus == FocusExpr {
-		m.exprInput, cmd = m.exprInput.Update(msg)
-		m.refreshExpr()
+	if m.focus == FocusDecl {
+		m.declInput, cmd = m.declInput.Update(msg)
 	} else {
 		m.cmdInput, cmd = m.cmdInput.Update(msg)
 	}
@@ -83,32 +90,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleEnter decide según el panel enfocado:
-//   - Expr: valida y guarda la expresión como f (foco salta al panel 2).
-//   - Cmd: si matchea una plantilla la inserta; si no, ejecuta el comando
-//     sobre la variable f guardada.
+//   - Declaración: si matchea una plantilla la inserta; si no, valida la
+//     declaración, la registra con auto-nombre (e1, f1, p1...) y el foco
+//     salta al panel 2.
+//   - Comando: si matchea una plantilla la inserta; si no, resuelve el
+//     objeto (por nombre o el último) y ejecuta el motor.
 func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.focus {
-	case FocusExpr:
-		expr := strings.TrimSpace(m.exprInput.Value())
-		if expr == "" {
-			m.addLog(LevelInfo, "Escribe una expresión matemática en el panel 1")
+	case FocusDecl:
+		raw := strings.TrimSpace(m.declInput.Value())
+		if raw == "" {
+			m.addLog(LevelInfo, "Declara un objeto: /ecuacion 2x+2=0, /funcion 2x+2 o /expresion x^2+1")
 			return m, nil
 		}
-		if err := engine.Validate(expr); err != nil {
-			m.exprValid = false
-			m.addLog(LevelError, "Expresión inválida: "+err.Error())
+		if tpl, ok := matchTemplate(declRegistry, raw); ok {
+			val, pos := JumpNextField(tpl.InsertText, 0)
+			m.declInput.SetValue(val)
+			m.declInput.SetCursor(pos)
+			m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
 			return m, nil
 		}
-		m.vars["f"] = expr
-		m.exprValid = true
-		m.addLog(LevelSuccess, "f = "+expr+" guardada")
+		d, err := engine.ParseDecl(raw)
+		if err != nil {
+			m.addLog(LevelError, err.Error())
+			return m, nil
+		}
+		d.Nombre = m.autoName(d.Tipo)
+		m.objs[d.Nombre] = d
+		m.lastObj = d.Nombre
+		m.declValid = true
+		m.tabHinted = false
+		m.addLog(LevelSuccess, d.Nombre+" declarada: "+d.Latex)
+		m.addLog(LevelStep, d.Pretty)
 		return m.switchPanel(), nil
 
 	case FocusCmd:
-		if !m.exprValid {
+		if !m.declValid {
 			return m, nil
 		}
-		if tpl, ok := MatchTemplate(m.cmdInput.Value()); ok {
+		if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
 			val, pos := JumpNextField(tpl.InsertText, 0)
 			m.cmdInput.SetValue(val)
 			m.cmdInput.SetCursor(pos)
@@ -117,52 +137,82 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		}
 
 		val := strings.TrimSpace(m.cmdInput.Value())
-		expr := m.vars["f"]
-		if val == "" || expr == "" {
+		if val == "" {
+			return m, nil
+		}
+		decl, varName, ok := m.resolveTarget(val)
+		if !ok {
 			return m, nil
 		}
 		m.pushHistory(val)
-		m.addLog(LevelInfo, "Comando: "+val+"  (f = "+expr+")")
-		return m, evaluateCmd(expr, val)
+		m.addLog(LevelInfo, fmt.Sprintf("Comando: %s  (objeto: %s = %s)", val, decl.Nombre, decl.Latex))
+		return m, evaluateCmd(decl, val, varName)
 	}
 	return m, nil
 }
 
+// resolveTarget averigua sobre qué objeto y variable opera el comando:
+//   - /resolver x     → último objeto, variable x
+//   - /resolver e1 x  → objeto e1, variable x
+//   - /resolver e1    → objeto e1 (variable por defecto x)
+//   - /resolver g1    → error si "g1" no es un objeto declarado
+func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
+	norm := strings.NewReplacer("(", "", ")", "", ",", "").Replace(cmd)
+	toks := strings.Fields(norm)
+	if len(toks) == 0 {
+		return engine.Decl{}, "", false
+	}
+	objName, varName := "", "x"
+	if len(toks) >= 2 {
+		name := toks[1]
+		if _, ok := m.objs[name]; ok {
+			objName = name
+			if len(toks) >= 3 {
+				varName = toks[2]
+			}
+		} else if len(name) == 1 {
+			varName = name
+		} else {
+			m.addLog(LevelError, fmt.Sprintf("objeto %q no declarado — declarados: %s", name, m.objList()))
+			return engine.Decl{}, "", false
+		}
+	}
+	if objName == "" {
+		objName = m.lastObj
+	}
+	if objName == "" {
+		m.addLog(LevelError, "no hay objetos declarados: declara uno en el panel 1 (/ecuacion 2x+2=0)")
+		return engine.Decl{}, "", false
+	}
+	return m.objs[objName], varName, true
+}
+
+// autoName asigna el siguiente nombre automático para el tipo: e1, e2...
+func (m *Model) autoName(t engine.DeclType) string {
+	m.counters[t]++
+	return fmt.Sprintf("%s%d", t.Prefix(), m.counters[t])
+}
+
 func (m Model) switchPanel() Model {
 	switch m.focus {
-	case FocusExpr:
-		// El panel 2 solo se habilita con una expresión válida guardada
-		if !m.exprValid || m.vars["f"] == "" {
+	case FocusDecl:
+		// El panel 2 solo se habilita con al menos un objeto declarado
+		if !m.declValid {
 			if !m.tabHinted {
 				m.tabHinted = true
-				m.addLog(LevelInfo, "Panel 2 bloqueado: escribe y valida una expresión en el panel 1 (Enter)")
+				m.addLog(LevelInfo, "Panel 2 bloqueado: declara un objeto en el panel 1 y pulsa Enter")
 			}
 			return m
 		}
 		m.focus = FocusCmd
-		m.exprInput.Blur()
+		m.declInput.Blur()
 		m.cmdInput.Focus()
 	default:
-		m.focus = FocusExpr
+		m.focus = FocusDecl
 		m.cmdInput.Blur()
-		m.exprInput.Focus()
+		m.declInput.Focus()
 	}
 	return m
-}
-
-// refreshExpr reevalúa la validez de la expresión en vivo. Si el usuario
-// rompe la expresión estando en el panel 2, vuelve automáticamente al 1.
-func (m *Model) refreshExpr() {
-	expr := strings.TrimSpace(m.exprInput.Value())
-	m.exprValid = engine.Validate(expr) == nil
-	if m.exprValid {
-		m.tabHinted = false
-	}
-	if !m.exprValid && m.focus == FocusCmd {
-		m.focus = FocusExpr
-		m.cmdInput.Blur()
-		m.exprInput.Focus()
-	}
 }
 
 // --- Historial del panel de comando ---
@@ -253,9 +303,9 @@ func (m *Model) updateLayout() {
 	_, rh := m.leftHeight(), m.rightHeight()
 	contentW := lw - chromeInW - chromeInW // área interior de los paneles 1/2
 
-	m.exprInput.Width = contentW - 7 // margen para el prompt "ƒ(x) = "
-	if m.exprInput.Width < 10 {
-		m.exprInput.Width = 10
+	m.declInput.Width = contentW - 3 // margen para el prompt "❯ "
+	if m.declInput.Width < 10 {
+		m.declInput.Width = 10
 	}
 	m.cmdInput.Width = contentW - 3 // margen para el prompt "❯ "
 	if m.cmdInput.Width < 10 {

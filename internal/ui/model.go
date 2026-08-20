@@ -4,19 +4,21 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"tuniversalcalc/internal/engine"
 )
 
 // Focus identifica qué panel tiene el cursor.
 type Focus int
 
 const (
-	FocusExpr Focus = iota
+	FocusDecl Focus = iota
 	FocusCmd
 )
 
 func (f Focus) String() string {
-	if f == FocusExpr {
-		return "Expresión"
+	if f == FocusDecl {
+		return "Declaración"
 	}
 	return "Comando"
 }
@@ -43,7 +45,7 @@ type Model struct {
 	width  int
 	height int
 
-	exprInput textinput.Model
+	declInput textinput.Model
 	cmdInput  textinput.Model
 	output    viewport.Model
 
@@ -52,38 +54,42 @@ type Model struct {
 	histIdx   int
 	outputLog []LogEntry
 
-	// Variables definidas por el usuario: la expresión del panel 1 se
-	// guarda como "f" al pulsar Enter (mapa listo para g, h, ...).
-	vars      map[string]string
-	exprValid bool
+	// Objetos declarados por el usuario: el panel 1 (siempre con
+	// slash-command) registra objetos con auto-nombre (e1, f1, p1...)
+	// y el panel 2 opera sobre ellos por nombre o sobre el último.
+	objs      map[string]engine.Decl
+	lastObj   string
+	counters  map[engine.DeclType]int
+	declValid bool
 	tabHinted bool
 }
 
 func NewModel() Model {
-	exprTi := textinput.New()
-	exprTi.Placeholder = "ej. x^2 + 3x - 5"
-	exprTi.Prompt = "ƒ(x) = "
-	exprTi.CharLimit = 200
-	exprTi.Focus()
+	declTi := textinput.New()
+	declTi.Placeholder = "ej. /ecuacion 2x+2=0, /funcion 2x+2"
+	declTi.Prompt = "❯ "
+	declTi.CharLimit = 200
+	declTi.Focus()
 
 	cmdTi := textinput.New()
-	cmdTi.Placeholder = "ej. /integral, /derivar, /limite"
+	cmdTi.Placeholder = "ej. /resolver x, /integral, /derivar"
 	cmdTi.Prompt = "❯ "
 	cmdTi.CharLimit = 200
 
 	output := viewport.New(60, 10)
 
 	m := Model{
-		exprInput: exprTi,
+		declInput: declTi,
 		cmdInput:  cmdTi,
 		output:    output,
-		focus:     FocusExpr,
+		focus:     FocusDecl,
 		histIdx:   -1,
-		vars:      map[string]string{},
+		objs:      map[string]engine.Decl{},
+		counters:  map[engine.DeclType]int{},
 		outputLog: []LogEntry{
 			{Level: LevelInfo, Content: "Bienvenido a TUnIversalCalc"},
-			{Level: LevelInfo, Content: "1. Escribe una expresión y pulsa Enter: se guardará como f."},
-			{Level: LevelInfo, Content: "2. Úsala en el panel de comandos: /integral f, /derivar f"},
+			{Level: LevelInfo, Content: "1. Declara un objeto: /ecuacion 2x+2=0, /funcion 2x+2 o /expresion x^2+1"},
+			{Level: LevelInfo, Content: "2. Opera por nombre o sobre el último objeto: /resolver x, /integral, /derivar"},
 		},
 	}
 	m.output.SetContent(m.renderLog())

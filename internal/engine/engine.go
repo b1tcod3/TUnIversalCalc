@@ -2,58 +2,68 @@ package engine
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"tuniversalcalc/internal/render"
 )
 
-// Evaluate es la interfaz asíncrona del motor: recibe una expresión y un
-// comando (ej. "/integral") y devuelve los pasos del cálculo en formato
-// Unicode para mostrar en el panel de salida.
+// Evaluate es la interfaz asíncrona del motor: recibe el objeto declarado
+// (sobre el que ya resolvió la UI), el comando del panel 2 y la variable,
+// y devuelve los pasos del cálculo para el panel de salida.
 //
-// Por ahora es un stub que simula los pasos; el parser real (Pratt) y el
-// cálculo simbólico llegarán en la siguiente fase con la misma firma.
-func Evaluate(expr, cmd string) ([]string, error) {
-	expr = strings.TrimSpace(expr)
-	if expr == "" {
-		return nil, errors.New("expresión vacía: escribe algo en el panel 1")
+// Por ahora es un stub que simula los pasos, pero ya es "inteligente":
+// devuelve errores claros para operaciones no reconocidas y contextualiza
+// cada paso con el nombre y el LaTeX del objeto. El parser real (Pratt)
+// llegará en la siguiente fase con la misma firma.
+func Evaluate(decl Decl, cmd, varName string) ([]string, error) {
+	if decl.Nombre == "" {
+		return nil, errors.New("objeto vacío: declara uno en el panel 1 (/ecuacion 2x+2=0)")
+	}
+	if varName == "" {
+		varName = "x"
 	}
 
 	op := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(cmd, "/")))
-	pretty := render.Pretty(expr)
+	op = strings.NewReplacer("(", "", ")", "", ",", "").Replace(op)
+	op = strings.TrimSpace(op)
+	if op == "" {
+		return nil, errors.New("comando vacío en el panel 2")
+	}
 
+	pretty, latex := decl.Pretty, decl.Latex
 	steps := []string{
-		"Expresión: " + pretty,
+		"Objeto: " + decl.Nombre + "  —  " + latex,
 	}
 
 	switch {
 	case strings.HasPrefix(op, "integral"):
 		steps = append(steps,
 			"Operación: integral",
-			"Se busca una antiderivada F tal que F′ = f",
-			"Aplicando la regla del poder y linealidad...",
-			"Resultado: "+render.IntegralSymbol+" ("+pretty+") dx  →  F(x) + C",
+			"Se busca una antiderivada F tal que F′ = "+decl.Nombre,
+			"Aplicando la regla del poder y la linealidad...",
+			render.IntegralSymbol+" ("+pretty+") d"+varName+"  →  F("+varName+") + C",
 		)
 
 	case strings.HasPrefix(op, "deriv"):
 		steps = append(steps,
 			"Operación: derivada",
-			"Aplicando la regla de la cadena y del poder...",
-			"Resultado: d/dx ("+pretty+")  →  f′(x)",
+			"Aplicando la regla del poder y de la cadena...",
+			"d/d"+varName+" ("+pretty+")  →  "+decl.Nombre+"′("+varName+")",
 		)
 
 	case strings.HasPrefix(op, "limit"):
 		steps = append(steps,
 			"Operación: límite",
-			"Sustituyendo el valor de la variable...",
-			"Resultado: lim ("+pretty+")  →  L",
+			"Sustituyendo "+varName+" → valor indicado...",
+			"lim ("+pretty+")  →  L",
 		)
 
 	case strings.HasPrefix(op, "resolver"):
 		steps = append(steps,
 			"Operación: resolver ecuación",
-			"Despejando la variable...",
-			"Resultado: solución de "+pretty+"  →  x = x₀",
+			"Despejando "+varName+" en "+decl.Nombre+"...",
+			"Resultado: "+pretty+"  →  "+varName+" = x₀ (simulado)",
 		)
 
 	case strings.HasPrefix(op, "simplificar"):
@@ -71,9 +81,13 @@ func Evaluate(expr, cmd string) ([]string, error) {
 		)
 
 	default:
-		steps = append(steps,
-			"Evaluación numérica (motor en desarrollo)",
-			"Resultado: "+pretty+"  ≈  42.0 (simulado)",
+		name := op
+		if f := strings.Fields(op); len(f) > 0 {
+			name = f[0]
+		}
+		return nil, fmt.Errorf(
+			"operación no reconocida: %q — usa /resolver, /integral, /derivar, /limite, /simplificar o /matriz",
+			name,
 		)
 	}
 

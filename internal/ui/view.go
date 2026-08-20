@@ -2,11 +2,12 @@ package ui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
-	"tuniversalcalc/internal/render"
+	"tuniversalcalc/internal/engine"
 )
 
 func (m Model) View() string {
@@ -19,22 +20,22 @@ func (m Model) View() string {
 	lw, rw := m.leftWidth(), m.rightWidth()
 	innerL, innerR := lw-chromeInW-chromeInW, rw-chromeOutW-chromeOutW
 
-	// --- PANEL 1: EXPRESIÓN ---
+	// --- PANEL 1: DECLARACIÓN ---
 	exprStyle := exprPanelInactive
-	if m.focus == FocusExpr {
+	if m.focus == FocusDecl {
 		exprStyle = exprPanelActive
 	}
 	exprStyle = exprStyle.Copy().Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
-	exprBody := m.exprInput.View() + m.exprEchoLine()
-	panel1 := exprStyle.Render(titleRight(" 1. Expresión Matemática ", " Expresión ", colorExprActive, innerL) + "\n\n" + exprBody)
+	exprBody := m.declInput.View() + m.declEchoLine()
+	panel1 := exprStyle.Render(titleRight(" 1. Declaración ", " Declaración ", colorExprActive, innerL) + "\n\n" + exprBody)
 
-	// --- PANEL 2: CÁLCULO (bloqueado sin expresión válida) ---
+	// --- PANEL 2: CÁLCULO (bloqueado sin objetos declarados) ---
 	calcContent := m.cmdInput.View()
-	if !m.exprValid {
-		calcContent = hintStyle.Render("⛔ Esperando expresión válida\n   Escribe f = expresión en el panel 1\n   y pulsa Enter para guardar.")
+	if !m.declValid {
+		calcContent = hintStyle.Render("⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /ecuacion 2x+2=0 (Enter)")
 	}
 	calcStyle := calcPanelInactive
-	if m.focus == FocusCmd && m.exprValid {
+	if m.focus == FocusCmd && m.declValid {
 		calcStyle = calcPanelActive
 	}
 	calcStyle = calcStyle.Copy().Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
@@ -72,20 +73,23 @@ func clampWidth(s string, max int) string {
 	return s
 }
 
-// exprEchoLine muestra en vivo la expresión como f: aunque el input recorte
-// el texto con scroll, siempre se ve el valor actual y su validez.
-func (m Model) exprEchoLine() string {
-	raw := strings.TrimSpace(m.exprInput.Value())
+// declEchoLine muestra en vivo cómo se interpreta la declaración del panel
+// 1 (auto-nombre + LaTeX + Unicode) y sus errores, aunque el input recorte
+// el texto con scroll. Solo lee estado: no registra ni muta nada.
+func (m Model) declEchoLine() string {
+	raw := strings.TrimSpace(m.declInput.Value())
 	if raw == "" {
 		return ""
 	}
-	mark := "✗"
-	markStyle := levelErrorStyle
-	if m.exprValid {
-		mark = "✔"
-		markStyle = levelSuccessStyle
+	innerL := m.leftWidth() - chromeInW - chromeInW
+	d, err := engine.ParseDecl(raw)
+	if err != nil {
+		return "\n\n" + levelErrorStyle.Render(clampWidth("✗ "+err.Error(), innerL-2))
 	}
-	return "\n\n" + levelInfoStyle.Render("f = "+render.Pretty(raw)+" ") + markStyle.Render(mark)
+	name := fmt.Sprintf("%s%d", d.Tipo.Prefix(), m.counters[d.Tipo]+1)
+	return "\n\n" +
+		levelInfoStyle.Render(clampWidth(name+" = "+d.Latex, innerL-2)) + " " + levelSuccessStyle.Render("✔") +
+		"\n" + levelInfoStyle.Render(clampWidth(d.Pretty, innerL-2))
 }
 
 // panel3Header es la parte superior del panel derecho: el banner grande si
@@ -120,24 +124,27 @@ func (m Model) panel3HeaderRows() int {
 }
 
 func (m Model) statusBar() string {
-	var fStatus string
-	raw := strings.TrimSpace(m.exprInput.Value())
-	switch {
-	case m.exprValid:
-		fStatus = "✔ " + raw
-	case raw != "":
-		fStatus = "✗ " + raw
-	default:
-		fStatus = "— en espera"
+	objs := m.objList()
+	if objs == "" {
+		objs = "—"
 	}
-
 	cmdState := "bloqueado"
-	if m.exprValid {
+	if m.declValid {
 		cmdState = "habilitado"
 	}
 
 	return statusStyle.Render(fmt.Sprintf(
-		"Modo: %s | f: %s | Comandos: %s | Historial: %d",
-		m.focus, fStatus, cmdState, len(m.history),
+		"Panel: %s | Objetos: %s | Comandos: %s | Historial: %d",
+		m.focus, objs, cmdState, len(m.history),
 	))
+}
+
+// objList devuelve los nombres de los objetos declarados ordenados.
+func (m Model) objList() string {
+	names := make([]string, 0, len(m.objs))
+	for n := range m.objs {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }

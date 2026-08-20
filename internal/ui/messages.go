@@ -14,9 +14,9 @@ type ResultMsg struct {
 
 // evaluateCmd ejecuta el motor de forma asíncrona (patrón Elm): devuelve un
 // comando que corre en otra goroutine y envía ResultMsg cuando termina.
-func evaluateCmd(expr, cmd string) tea.Cmd {
+func evaluateCmd(decl engine.Decl, cmd, varName string) tea.Cmd {
 	return func() tea.Msg {
-		steps, err := engine.Evaluate(expr, cmd)
+		steps, err := engine.Evaluate(decl, cmd, varName)
 		return ResultMsg{Steps: steps, Err: err}
 	}
 }

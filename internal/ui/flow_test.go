@@ -15,8 +15,8 @@ func TestViewFitsHeight(t *testing.T) {
 		m := NewModel()
 		m.width, m.height = size[0], size[1]
 		m.updateLayout()
-		m.exprInput.SetValue("2x+2")
-		m.exprValid = true
+		m.declInput.SetValue("/funcion 2x+2")
+		m.declValid = true
 		lines := strings.Count(m.View(), "\n") + 1
 		if lines > m.height {
 			t.Errorf("%dx%d: View mide %d líneas, la terminal tiene %d → se corta arriba",
@@ -61,48 +61,57 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestFlowGuardarYUsarF(t *testing.T) {
+func TestFlowDeclararYOperar(t *testing.T) {
 	m := NewModel()
 	m.width, m.height = 100, 28
 	m.updateLayout()
 
 	// Estado inicial: panel 2 bloqueado
-	if m.exprValid {
-		t.Fatal("sin expresión, exprValid debe ser false")
+	if m.declValid {
+		t.Fatal("sin objetos, declValid debe ser false")
 	}
 	if v := m.View(); !strings.Contains(v, "⛔") {
 		t.Fatal("panel 2 debe mostrar el hint de bloqueado")
 	}
 
-	// Escribir expresión válida y Enter -> guarda f, foco al panel 2
-	m.exprInput.SetValue("2x+2")
-	m.refreshExpr()
-	if !m.exprValid {
-		t.Fatal("2x+2 debe ser válida")
-	}
+	// Escribir /ecuacion 2x+2=0 y Enter -> auto-e1 registrada, foco al panel 2
+	m.declInput.SetValue("/ecuacion 2x+2=0")
 	nm, _ := m.handleEnter()
 	m = nm.(Model)
-	if m.vars["f"] != "2x+2" {
-		t.Fatalf("f no guardada: %q", m.vars["f"])
+	if d, ok := m.objs["e1"]; !ok || d.Tipo != engine.DeclEcuacion || d.Latex != "2x + 2 = 0" {
+		t.Fatalf("e1 no registrada correctamente: %+v", m.objs)
+	}
+	if m.lastObj != "e1" || !m.declValid {
+		t.Fatalf("lastObj=%q declValid=%v", m.lastObj, m.declValid)
 	}
 	if m.focus != FocusCmd {
-		t.Fatal("foco debe pasar al panel 2 tras guardar f")
+		t.Fatal("foco debe pasar al panel 2 tras declarar")
 	}
 
-	// Tab desde el panel 2 vuelve al 1; sin expresión, Tab desde 1 se bloquea
+	// Tab desde el panel 2 vuelve al 1; sin objetos, Tab desde 1 se bloquea
 	m = m.switchPanel()
-	if m.focus != FocusExpr {
+	if m.focus != FocusDecl {
 		t.Fatal("Tab debe devolver el foco al panel 1")
 	}
 	m2 := NewModel()
 	m2 = m2.switchPanel()
-	if m2.focus != FocusExpr {
-		t.Fatal("Tab no debe habilitar el panel 2 sin expresión válida")
+	if m2.focus != FocusDecl {
+		t.Fatal("Tab no debe habilitar el panel 2 sin objetos declarados")
 	}
 
-	// Ejecutar /integral f sobre la variable guardada
-	m = m.switchPanel()
-	m.cmdInput.SetValue("/integral f")
+	// Segunda declaración: /funcion 2x+2 -> auto-f1, es el último objeto
+	m.declInput.SetValue("/funcion 2x+2")
+	nm, _ = m.handleEnter()
+	m = nm.(Model)
+	if d, ok := m.objs["f1"]; !ok || d.Tipo != engine.DeclFuncion {
+		t.Fatalf("f1 no registrada: %+v", m.objs)
+	}
+	if m.lastObj != "f1" {
+		t.Fatalf("lastObj debe ser f1, es %q", m.lastObj)
+	}
+
+	// /resolver x -> opera sobre el último objeto (f1)
+	m.cmdInput.SetValue("/resolver x")
 	nm, cmd := m.handleEnter()
 	m = nm.(Model)
 	if cmd == nil {
@@ -117,17 +126,62 @@ func TestFlowGuardarYUsarF(t *testing.T) {
 	for _, s := range res.Steps {
 		all += " " + s
 	}
-	if !strings.Contains(all, "∫") || !strings.Contains(all, "2x+2") {
-		t.Fatalf("pasos sin ∫ ni 2x+2: %q", all)
+	if !strings.Contains(all, "f1") || !strings.Contains(all, "2x + 2") {
+		t.Fatalf("pasos sin objeto f1 ni LaTeX: %q", all)
 	}
 
-	// Romper la expresión estando en panel 2 -> volver al 1
-	m.exprInput.SetValue("x^2+")
-	m.refreshExpr()
-	if m.exprValid {
-		t.Fatal("x^2+ debe ser inválida")
+	// /resolver e1 x -> objeto explícito con variable
+	m.cmdInput.SetValue("/resolver e1 x")
+	nm, cmd = m.handleEnter()
+	m = nm.(Model)
+	if cmd == nil {
+		t.Fatal("debe lanzarse el comando async")
 	}
-	if m.focus != FocusExpr {
-		t.Fatal("foco debe volver al panel 1 si la expresión se rompe")
+	res = cmd().(ResultMsg)
+	if !strings.Contains(strings.Join(res.Steps, " "), "e1") {
+		t.Fatalf("pasos sin objeto e1: %q", res.Steps)
+	}
+
+	// Error inteligente: objeto inexistente
+	m.cmdInput.SetValue("/resolver g1")
+	nm, cmd = m.handleEnter()
+	m = nm.(Model)
+	if cmd != nil {
+		t.Fatal("no debe lanzarse comando con objeto inexistente")
+	}
+	last := m.outputLog[len(m.outputLog)-1]
+	if last.Level != LevelError || !strings.Contains(last.Content, "g1") || !strings.Contains(last.Content, "e1") {
+		t.Fatalf("error esperado citando g1 y objetos: %+v", last)
+	}
+
+	// Error del motor: operación no reconocida
+	m.cmdInput.SetValue("/voltear e1")
+	nm, cmd = m.handleEnter()
+	m = nm.(Model)
+	if cmd == nil {
+		t.Fatal("debe lanzarse el comando async")
+	}
+	msg = cmd()
+	res, ok = msg.(ResultMsg)
+	if !ok || res.Err == nil {
+		t.Fatalf("se esperaba error de operación: %+v", msg)
+	}
+
+	// Plantilla de declaración en el panel 1: "/ecu" -> "/ecuacion ?"
+	m = m.switchPanel()
+	m.declInput.SetValue("/ecu")
+	nm, _ = m.handleEnter()
+	m = nm.(Model)
+	if m.declInput.Value() != "/ecuacion " {
+		t.Fatalf("plantilla no insertada: %q", m.declInput.Value())
+	}
+
+	// Declaración inválida: error en log y sin bloqueo posterior
+	m.declInput.SetValue("/funcion x=2")
+	nm, _ = m.handleEnter()
+	m = nm.(Model)
+	last = m.outputLog[len(m.outputLog)-1]
+	if last.Level != LevelError || !strings.Contains(last.Content, "no lleva") {
+		t.Fatalf("error esperado por '=' en función: %+v", last)
 	}
 }
