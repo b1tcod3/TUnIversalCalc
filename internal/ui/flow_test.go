@@ -27,27 +27,27 @@ func TestViewFitsHeight(t *testing.T) {
 		m.updateLayout()
 		m.declInput.SetValue("/funcion 2x+2")
 		m.declValid = true
-		checkView(t, m, size, "normal")
+		checkView(t, &m, size, "normal")
 
 		// Paleta abierta en el panel de declaración ("/" lista todo)
 		m.declInput.SetValue("/")
 		m.refreshPalette()
-		checkView(t, m, size, "paleta-declaracion")
+		checkView(t, &m, size, "paleta-declaracion")
 
 		// Paleta abierta en el panel de comandos
 		m.focus = FocusCmd
 		m.cmdInput.SetValue("/")
 		m.refreshPalette()
-		checkView(t, m, size, "paleta-comando")
+		checkView(t, &m, size, "paleta-comando")
 
 		// Sin matches (fragmento roto): paleta cerrada pero sigue el layout
 		m.cmdInput.SetValue("/rslv x")
 		m.refreshPalette()
-		checkView(t, m, size, "sin-match")
+		checkView(t, &m, size, "sin-match")
 	}
 }
 
-func checkView(t *testing.T, m Model, size [2]int, label string) {
+func checkView(t *testing.T, m *Model, size [2]int, label string) {
 	t.Helper()
 	lines := strings.Count(m.View(), "\n") + 1
 	if lines > m.height {
