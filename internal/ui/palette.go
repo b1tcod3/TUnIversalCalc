@@ -152,7 +152,7 @@ func (m *Model) paletteSelect() {
 
 // paletteView pinta las filas visibles de la paleta (sin salto final):
 // trigger resaltado, plantilla y descripción truncadas al ancho interior.
-func (m Model) paletteView() string {
+func (m *Model) paletteView() string {
 	if !m.palette.Open || len(m.palette.List) == 0 {
 		return ""
 	}

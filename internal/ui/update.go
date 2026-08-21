@@ -20,82 +20,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ResultMsg:
-		if msg.Err != nil {
-			m.addLog(LevelError, msg.Err.Error())
-			return m, nil
-		}
-		for _, s := range msg.Steps {
-			m.addLog(LevelStep, s)
-		}
-		m.addLog(LevelSuccess, "Listo")
+		m.applyResult(msg)
 		return m, nil
 
 	case tea.KeyMsg:
-		// Paleta abierta: navegar, insertar o cerrar tiene prioridad
-		if m.palette.Open {
-			switch msg.Type {
-			case tea.KeyUp, tea.KeyShiftTab:
-				m.paletteUp()
-				return m, nil
-			case tea.KeyDown, tea.KeyTab:
-				m.paletteDown()
-				return m, nil
-			case tea.KeyEnter:
-				m.paletteSelect()
-				return m, nil
-			case tea.KeyEsc:
-				m.closePalette()
-				return m, nil
-			}
-			// Las demás teclas caen al input y refiltran la lista
-		}
-
-		switch msg.Type {
-
-		case tea.KeyCtrlC, tea.KeyEsc:
-			return m, tea.Quit
-
-		// Navegación entre paneles
-		case tea.KeyTab:
-			m.switchPanel()
-			return m, nil
-
-		// Salto de campo dentro de una plantilla (ambos paneles)
-		case tea.KeyShiftTab:
-			var ti *textinput.Model
-			if m.focus == FocusDecl {
-				ti = &m.declInput
-			} else {
-				ti = &m.cmdInput
-			}
-			if !HasFields(ti.Value()) {
-				return m, nil
-			}
-			val, pos := JumpNextField(ti.Value(), ti.Position())
-			ti.SetValue(val)
-			ti.SetCursor(pos)
-			return m, nil
-
-		case tea.KeyEnter:
-			cmd := m.handleEnter()
-			return m, cmd
-
-		// Historial navegable en el panel de comando
-		case tea.KeyUp:
-			if m.focus == FocusCmd {
-				m.histPrev()
-				return m, nil
-			}
-		case tea.KeyDown:
-			if m.focus == FocusCmd {
-				m.histNext()
-				return m, nil
-			}
-
-		// Scroll del panel de salida
-		case tea.KeyPgUp, tea.KeyPgDown:
-			var cmd tea.Cmd
-			m.output, cmd = m.output.Update(msg)
+		if cmd, handled := m.handleKey(msg); handled {
 			return m, cmd
 		}
 	}
@@ -109,6 +38,104 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.refreshPalette()
 	return m, cmd
+}
+
+// applyResult vuelca el resultado del motor en el log de salida.
+func (m *Model) applyResult(res ResultMsg) {
+	if res.Err != nil {
+		m.addLog(LevelError, res.Err.Error())
+		return
+	}
+	for _, s := range res.Steps {
+		m.addLog(LevelStep, s)
+	}
+	m.addLog(LevelSuccess, "Listo")
+}
+
+// handleKey procesa una tecla. El segundo valor indica si el mensaje quedó
+// manejado; si no, cae al input enfocado.
+func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	// Paleta abierta: navegar, insertar o cerrar tiene prioridad
+	if m.palette.Open {
+		return m.handlePaletteKey(msg)
+	}
+
+	switch msg.Type {
+
+	case tea.KeyCtrlC, tea.KeyEsc:
+		return tea.Quit, true
+
+	// Navegación entre paneles
+	case tea.KeyTab:
+		m.switchPanel()
+		return nil, true
+
+	// Salto de campo dentro de una plantilla (ambos paneles)
+	case tea.KeyShiftTab:
+		m.jumpNextTemplateField()
+		return nil, true
+
+	case tea.KeyEnter:
+		return m.handleEnter(), true
+
+	// Historial navegable en el panel de comando
+	case tea.KeyUp:
+		if m.focus == FocusCmd {
+			m.histPrev()
+			return nil, true
+		}
+
+	case tea.KeyDown:
+		if m.focus == FocusCmd {
+			m.histNext()
+			return nil, true
+		}
+
+	// Scroll del panel de salida
+	case tea.KeyPgUp, tea.KeyPgDown:
+		var cmd tea.Cmd
+		m.output, cmd = m.output.Update(msg)
+		return cmd, true
+	}
+	return nil, false
+}
+
+// handlePaletteKey gestiona las teclas con la paleta abierta. Las teclas
+// no reconocidas devuelven handled=false para que caigan al input y
+// refiltren la lista.
+func (m *Model) handlePaletteKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.Type {
+	case tea.KeyUp, tea.KeyShiftTab:
+		m.paletteUp()
+		return nil, true
+	case tea.KeyDown, tea.KeyTab:
+		m.paletteDown()
+		return nil, true
+	case tea.KeyEnter:
+		m.paletteSelect()
+		return nil, true
+	case tea.KeyEsc:
+		m.closePalette()
+		return nil, true
+	}
+	return nil, false
+}
+
+// jumpNextTemplateField salta al siguiente marcador "?" de la plantilla
+// del input enfocado (Shift+Tab).
+func (m *Model) jumpNextTemplateField() {
+	var ti *textinput.Model
+	if m.focus == FocusDecl {
+		ti = &m.declInput
+	} else {
+		ti = &m.cmdInput
+	}
+	if !HasFields(ti.Value()) {
+		return
+	}
+	val, pos := JumpNextField(ti.Value(), ti.Position())
+	ti.SetValue(val)
+	ti.SetCursor(pos)
 }
 
 // handleEnter decide según el panel enfocado:
@@ -281,7 +308,7 @@ func (m *Model) addLog(level LogLevel, content string) {
 	m.output.GotoBottom()
 }
 
-func (m Model) renderLog() string {
+func (m *Model) renderLog() string {
 	var b strings.Builder
 	for i, e := range m.outputLog {
 		if i > 0 {
@@ -358,7 +385,7 @@ func (m *Model) updateLayout() {
 	}
 }
 
-func (m Model) leftWidth() int {
+func (m *Model) leftWidth() int {
 	w := m.width * 50 / 100
 	if w < 45 {
 		w = 45
@@ -366,22 +393,22 @@ func (m Model) leftWidth() int {
 	return w
 }
 
-func (m Model) rightWidth() int {
+func (m *Model) rightWidth() int {
 	return m.width - m.leftWidth() - 3
 }
 
-func (m Model) leftHeight() int {
+func (m *Model) leftHeight() int {
 	return m.gridAvailable() / 2
 }
 
-func (m Model) rightHeight() int {
+func (m *Model) rightHeight() int {
 	return m.gridAvailable()
 }
 
 // gridAvailable es la altura que queda para la cuadrícula tras restar
 // las 2 líneas de chrome (ayuda + estado). Mantener esto exacto evita
 // que la View desborde la terminal y corte la parte superior.
-func (m Model) gridAvailable() int {
+func (m *Model) gridAvailable() int {
 	if h := m.height - 2; h > 0 {
 		return h
 	}

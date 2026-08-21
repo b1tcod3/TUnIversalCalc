@@ -135,10 +135,8 @@ func TestPaletteScroll(t *testing.T) {
 	}
 }
 
-func TestPaletteOpenCloseYSeleccion(t *testing.T) {
-	m := NewModel()
-	m.width, m.height = 100, 28
-	m.updateLayout()
+func TestPaletteAbreEnPanel1(t *testing.T) {
+	m := newFlowModel()
 
 	// Sin "/" no hay paleta
 	m.declInput.SetValue("2x+2")
@@ -159,6 +157,10 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	if m.palette.Sel != 0 || m.palette.Anchor != FocusDecl {
 		t.Fatalf("selección/ancla inicial incorrecta: %+v", m.palette)
 	}
+}
+
+func TestPaletteFuzzyEInsercion(t *testing.T) {
+	m := newFlowModel()
 
 	// Fuzzy: "/fnc" solo deja funcion
 	m.declInput.SetValue("/fnc")
@@ -175,10 +177,15 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	if m.palette.Open {
 		t.Fatal("la paleta debe cerrarse al seleccionar")
 	}
+}
 
-	// Navegación con clamp (sin wrap)
+func TestPaletteNavegacionClamp(t *testing.T) {
+	m := newFlowModel()
+
 	m.declInput.SetValue("/")
 	m.refreshPalette()
+
+	// Navegación con clamp (sin wrap)
 	m.paletteDown()
 	if m.palette.Sel != 1 {
 		t.Fatalf("Tab debe bajar a 1, quedó %d", m.palette.Sel)
@@ -198,15 +205,20 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	if m.palette.Sel != 0 {
 		t.Fatalf("la selección debe quedarse en 0, quedó %d", m.palette.Sel)
 	}
+}
 
-	// Esc cierra
-	m.paletteUp() // cualquier estado para asegurar que está abierta
+func TestPaletteCierre(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/")
+	m.refreshPalette()
 	if !m.palette.Open {
 		t.Fatal("la paleta debe estar abierta")
 	}
-	m.palette = Palette{}
+
+	// Cerrar la paleta (lo que hace Esc)
+	m.closePalette()
 	if m.palette.Open {
-		t.Fatal("Esc debe cerrar la paleta")
+		t.Fatal("la paleta debe cerrarse")
 	}
 
 	// Coincidencia exacta de trigger cierra (se escribe la orden a mano)
@@ -222,12 +234,16 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	if m.palette.Open {
 		t.Fatal("la paleta debe cerrarse sin coincidencias")
 	}
+}
 
-	// Panel 2: "/rslv" → resolver; Enter inserta plantilla de operación
+func TestPalettePanel2Operaciones(t *testing.T) {
+	m := newFlowModel()
 	m.focus = FocusCmd
 	m.cmdInput.Blur()
 	m.declInput.Blur()
 	m.cmdInput.Focus()
+
+	// Panel 2: "/rslv" → resolver; Enter inserta plantilla de operación
 	m.cmdInput.SetValue("/rslv")
 	m.refreshPalette()
 	if !m.palette.Open || !reflect.DeepEqual(names(m.palette.List), []string{"resolver"}) {
@@ -248,6 +264,10 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	if m.palette.Open {
 		t.Fatal("cambiar de panel debe cerrar la paleta")
 	}
+}
+
+func TestPaletteConObjetosRegistrados(t *testing.T) {
+	m := newFlowModel()
 
 	// El objeto registrado no interfiere con la paleta
 	decl := engine.Decl{Tipo: engine.DeclFuncion, Nombre: "f1", Latex: "2x + 2"}

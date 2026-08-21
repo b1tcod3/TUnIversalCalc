@@ -85,7 +85,7 @@ func clampWidth(s string, maxW int) string {
 // declEchoLine muestra en vivo cómo se interpreta la declaración del panel
 // 1 (auto-nombre + LaTeX + Unicode) y sus errores, aunque el input recorte
 // el texto con scroll. Solo lee estado: no registra ni muta nada.
-func (m Model) declEchoLine() string {
+func (m *Model) declEchoLine() string {
 	raw := strings.TrimSpace(m.declInput.Value())
 	if raw == "" {
 		return ""
@@ -104,7 +104,7 @@ func (m Model) declEchoLine() string {
 // panel3Header es la parte superior del panel derecho: el banner grande si
 // hay ancho, o una marca compacta que nunca envuelve; debajo el título de
 // vista a la derecha.
-func (m Model) panel3Header(innerW int) string {
+func (m *Model) panel3Header(innerW int) string {
 	brand := ""
 	switch {
 	case m.showBanner():
@@ -119,20 +119,20 @@ func (m Model) panel3Header(innerW int) string {
 
 // showBanner indica si el arte ASCII cabe en el panel derecho
 // (ancho y alto suficientes para no exprimir el viewport).
-func (m Model) showBanner() bool {
+func (m *Model) showBanner() bool {
 	return m.rightWidth() >= bannerWidth+6 &&
 		m.rightHeight() >= bannerRows+10
 }
 
 // panel3HeaderRows: filas que consume la cabecera del panel derecho.
-func (m Model) panel3HeaderRows() int {
+func (m *Model) panel3HeaderRows() int {
 	if m.showBanner() {
 		return bannerRows + 2 // banner (4) + título (1) + blanco (1)
 	}
 	return 3 // marca (1) + título (1) + blanco (1)
 }
 
-func (m Model) statusBar() string {
+func (m *Model) statusBar() string {
 	objs := m.objList()
 	if objs == "" {
 		objs = "—"
@@ -149,7 +149,7 @@ func (m Model) statusBar() string {
 }
 
 // objList devuelve los nombres de los objetos declarados ordenados.
-func (m Model) objList() string {
+func (m *Model) objList() string {
 	names := make([]string, 0, len(m.objs))
 	for n := range m.objs {
 		names = append(names, n)

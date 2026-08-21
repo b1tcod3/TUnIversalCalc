@@ -92,52 +92,98 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestFlowDeclararYOperar(t *testing.T) {
+// newFlowModel devuelve un modelo con layout calculado para las pruebas
+// de flujo (terminal 100x28).
+func newFlowModel() Model {
 	m := NewModel()
 	m.width, m.height = 100, 28
 	m.updateLayout()
+	return m
+}
 
-	// Estado inicial: panel 2 bloqueado
+// declararEcuacion registra e1 = 2x + 2 = 0 vía el panel 1.
+func declararEcuacion(t *testing.T, m *Model) {
+	t.Helper()
+	m.declInput.SetValue("/ecuacion 2x+2=0")
+	m.handleEnter()
+	d, ok := m.objs["e1"]
+	if !ok || d.Tipo != engine.DeclEcuacion || d.Latex != "2x + 2 = 0" {
+		t.Fatalf("e1 no registrada correctamente: %+v", m.objs)
+	}
+}
+
+// declararEcuacionYFuncion registra e1 y f1 y deja el foco en el panel 2.
+func declararEcuacionYFuncion(t *testing.T, m *Model) {
+	t.Helper()
+	declararEcuacion(t, m)
+	m.switchPanel() // volver al panel 1 para declarar la función
+	m.declInput.SetValue("/funcion 2x+2")
+	m.handleEnter()
+	if _, ok := m.objs["f1"]; !ok {
+		t.Fatalf("f1 no registrada: %+v", m.objs)
+	}
+}
+
+func TestEstadoInicialPanel2Bloqueado(t *testing.T) {
+	m := newFlowModel()
+
 	if m.declValid {
 		t.Fatal("sin objetos, declValid debe ser false")
 	}
 	if v := m.View(); !strings.Contains(v, "⛔") {
 		t.Fatal("panel 2 debe mostrar el hint de bloqueado")
 	}
+}
 
-	// Escribir /ecuacion 2x+2=0 y Enter -> auto-e1 registrada, foco al panel 2
-	m.declInput.SetValue("/ecuacion 2x+2=0")
-	m.handleEnter()
-	if d, ok := m.objs["e1"]; !ok || d.Tipo != engine.DeclEcuacion || d.Latex != "2x + 2 = 0" {
-		t.Fatalf("e1 no registrada correctamente: %+v", m.objs)
-	}
+func TestDeclararEcuacionAutoNombre(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacion(t, &m)
+
 	if m.lastObj != "e1" || !m.declValid {
 		t.Fatalf("lastObj=%q declValid=%v", m.lastObj, m.declValid)
 	}
 	if m.focus != FocusCmd {
 		t.Fatal("foco debe pasar al panel 2 tras declarar")
 	}
+}
 
-	// Tab desde el panel 2 vuelve al 1; sin objetos, Tab desde 1 se bloquea
+func TestTabNavegacionPaneles(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacion(t, &m)
+
+	// Tab desde el panel 2 vuelve al 1
 	m.switchPanel()
 	if m.focus != FocusDecl {
 		t.Fatal("Tab debe devolver el foco al panel 1")
 	}
-	m2 := NewModel()
+
+	// Sin objetos, Tab desde el panel 1 se bloquea
+	m2 := newFlowModel()
 	m2.switchPanel()
 	if m2.focus != FocusDecl {
 		t.Fatal("Tab no debe habilitar el panel 2 sin objetos declarados")
 	}
+}
+
+func TestDeclararFuncionAutoNombre(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacion(t, &m)
+	m.switchPanel()
 
 	// Segunda declaración: /funcion 2x+2 -> auto-f1, es el último objeto
 	m.declInput.SetValue("/funcion 2x+2")
 	m.handleEnter()
-	if d, ok := m.objs["f1"]; !ok || d.Tipo != engine.DeclFuncion {
+	if _, ok := m.objs["f1"]; !ok {
 		t.Fatalf("f1 no registrada: %+v", m.objs)
 	}
 	if m.lastObj != "f1" {
 		t.Fatalf("lastObj debe ser f1, es %q", m.lastObj)
 	}
+}
+
+func TestResolverUltimoObjeto(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacionYFuncion(t, &m)
 
 	// /resolver x -> opera sobre el último objeto (f1)
 	m.cmdInput.SetValue("/resolver x")
@@ -150,29 +196,35 @@ func TestFlowDeclararYOperar(t *testing.T) {
 	if !ok || res.Err != nil {
 		t.Fatalf("ResultMsg inesperado: %+v", msg)
 	}
-	var all string
-	for _, s := range res.Steps {
-		all += " " + s
-	}
+	all := strings.Join(res.Steps, " ")
 	if !strings.Contains(all, "f1") || !strings.Contains(all, "2x + 2") {
 		t.Fatalf("pasos sin objeto f1 ni LaTeX: %q", all)
 	}
+}
+
+func TestResolverObjetoExplicito(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacionYFuncion(t, &m)
 
 	// /resolver e1 x -> objeto explícito con variable
 	m.cmdInput.SetValue("/resolver e1 x")
-	cmd = m.handleEnter()
+	cmd := m.handleEnter()
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
 	}
-	res = cmd().(ResultMsg)
+	res := cmd().(ResultMsg)
 	if !strings.Contains(strings.Join(res.Steps, " "), "e1") {
 		t.Fatalf("pasos sin objeto e1: %q", res.Steps)
 	}
+}
+
+func TestResolverErrores(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacionYFuncion(t, &m)
 
 	// Error inteligente: objeto inexistente
 	m.cmdInput.SetValue("/resolver g1")
-	cmd = m.handleEnter()
-	if cmd != nil {
+	if cmd := m.handleEnter(); cmd != nil {
 		t.Fatal("no debe lanzarse comando con objeto inexistente")
 	}
 	last := m.outputLog[len(m.outputLog)-1]
@@ -182,15 +234,20 @@ func TestFlowDeclararYOperar(t *testing.T) {
 
 	// Error del motor: operación no reconocida
 	m.cmdInput.SetValue("/voltear e1")
-	cmd = m.handleEnter()
+	cmd := m.handleEnter()
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
 	}
-	msg = cmd()
-	res, ok = msg.(ResultMsg)
+	msg := cmd()
+	res, ok := msg.(ResultMsg)
 	if !ok || res.Err == nil {
 		t.Fatalf("se esperaba error de operación: %+v", msg)
 	}
+}
+
+func TestPlantillaYDeclaracionInvalida(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacionYFuncion(t, &m)
 
 	// Plantilla de declaración en el panel 1: "/ecu" -> "/ecuacion ?"
 	m.switchPanel()
@@ -203,7 +260,7 @@ func TestFlowDeclararYOperar(t *testing.T) {
 	// Declaración inválida: error en log y sin bloqueo posterior
 	m.declInput.SetValue("/funcion x=2")
 	m.handleEnter()
-	last = m.outputLog[len(m.outputLog)-1]
+	last := m.outputLog[len(m.outputLog)-1]
 	if last.Level != LevelError || !strings.Contains(last.Content, "no lleva") {
 		t.Fatalf("error esperado por '=' en función: %+v", last)
 	}

@@ -34,52 +34,61 @@ func collectTerms(e Expr) []symTerm {
 				walk(t, sign)
 			}
 		case Mul:
-			coeff := sign
-			var rest []Expr
-			ok := true
-			for _, f := range n.Factors {
-				switch ff := f.(type) {
-				case Num:
-					v, err := ff.Float()
-					if err != nil {
-						ok = false
-						break
-					}
-					coeff *= v
-				case Neg:
-					inner := ff.X
-					if num, isn := inner.(Num); isn {
-						v, err := num.Float()
-						if err == nil {
-							coeff *= -v
-							continue
-						}
-					}
-					coeff = -coeff
-					rest = append(rest, inner)
-				default:
-					rest = append(rest, f)
-				}
-			}
+			coeff, rest, ok := mulCoeffRest(n.Factors, sign)
 			if !ok {
 				terms = append(terms, symTerm{coeff: 1, rest: x})
 				return
 			}
-			var r Expr
-			switch len(rest) {
-			case 0:
-			case 1:
-				r = rest[0]
-			default:
-				r = Mul{Factors: rest}
-			}
-			terms = append(terms, symTerm{coeff: coeff, rest: r})
+			terms = append(terms, symTerm{coeff: coeff, rest: restToExpr(rest)})
 		default:
 			terms = append(terms, symTerm{coeff: sign, rest: x})
 		}
 	}
 	walk(e, 1)
 	return terms
+}
+
+// mulCoeffRest separa los factores de un producto en coeficiente numérico
+// y resto no numérico. ok=false si algún Num está mal formado.
+func mulCoeffRest(factors []Expr, sign float64) (coeff float64, rest []Expr, ok bool) {
+	coeff = sign
+	for _, f := range factors {
+		switch ff := f.(type) {
+		case Num:
+			v, err := ff.Float()
+			if err != nil {
+				return 0, nil, false
+			}
+			coeff *= v
+		case Neg:
+			inner := ff.X
+			if num, isn := inner.(Num); isn {
+				v, err := num.Float()
+				if err == nil {
+					coeff *= -v
+					continue
+				}
+			}
+			coeff = -coeff
+			rest = append(rest, inner)
+		default:
+			rest = append(rest, f)
+		}
+	}
+	return coeff, rest, true
+}
+
+// restToExpr reconstruye el resto de un término: nil si vacío, el único
+// factor si hay uno, o un producto con todos.
+func restToExpr(rest []Expr) Expr {
+	switch len(rest) {
+	case 0:
+		return nil
+	case 1:
+		return rest[0]
+	default:
+		return Mul{Factors: rest}
+	}
 }
 
 // termKey identifica un término: el resto en forma canónica.
@@ -93,7 +102,7 @@ func termKey(t symTerm) string {
 // mergeTerms agrupa términos con el mismo resto y reordena las constantes
 // primero (detección de polinomios). Devuelve la lista agrupada.
 func mergeTerms(terms []symTerm) []symTerm {
-	order := []string{}
+	var order []string
 	byKey := map[string]float64{}
 	rests := map[string]Expr{}
 	for _, t := range terms {
@@ -158,17 +167,7 @@ func simplifyNormaliza(e Expr) Expr {
 	case Num, Var, Const:
 		return e
 	case Neg:
-		x := simplifyNormaliza(n.X)
-		switch xx := x.(type) {
-		case Num:
-			f, err := xx.Float()
-			if err == nil {
-				return Num{Text: NumFromFloat(-f).Text}
-			}
-		case Neg:
-			return simplifyNormaliza(xx.X)
-		}
-		return Neg{X: x}
+		return simplifyNeg(n)
 	case Add:
 		var children []Expr
 		for _, t := range n.Terms {
@@ -178,55 +177,114 @@ func simplifyNormaliza(e Expr) Expr {
 	case Mul:
 		return simplifyMulForzado(n)
 	case Div:
-		num, den := simplifyNormaliza(n.Num), simplifyNormaliza(n.Den)
-		if nf, ok := matchNum(num); ok {
-			if nf == 0 {
-				return Num{Text: "0"}
-			}
-			if df, ok := matchNum(den); ok && df != 0 {
-				return Num{Text: NumFromFloat(nf / df).Text}
-			}
-		}
-		if df, ok := matchNum(den); ok && df == 1 {
-			return num
-		}
-		if _, neg := den.(Neg); neg {
-			// el signo va arriba: a/(-b) → -(a/b)
-			return Neg{X: simplifyNormaliza(Div{Num: num, Den: den.(Neg).X})}
-		}
-		return Div{Num: num, Den: den}
+		return simplifyDiv(n)
 	case Pow:
-		base, exp := simplifyNormaliza(n.Base), simplifyNormaliza(n.Exp)
-		if ef, ok := matchNum(exp); ok {
-			if ef == 0 {
-				return Num{Text: "1"}
-			}
-			if ef == 1 {
-				return base
-			}
-			if ef == -1 {
-				// x^(-1) se muestra como 1/x
-				return Div{Num: Num{Text: "1"}, Den: base}
-			}
-			if bf, ok := matchNum(base); ok {
-				if v, valid := powFloat(bf, ef); valid {
-					return Num{Text: NumFromFloat(v).Text}
-				}
-			}
-		}
-		if bf, ok := matchNum(base); ok && bf == 1 {
-			return Num{Text: "1"}
-		}
-		return Pow{Base: base, Exp: exp}
+		return simplifyPow(n)
 	case Call:
 		return Call{Name: n.Name, Arg: simplifyNormaliza(n.Arg)}
 	}
 	return e
 }
 
+// simplifyNeg pliega la negación de constantes y el doble signo.
+func simplifyNeg(n Neg) Expr {
+	x := simplifyNormaliza(n.X)
+	switch xx := x.(type) {
+	case Num:
+		f, err := xx.Float()
+		if err == nil {
+			return Num{Text: NumFromFloat(-f).Text}
+		}
+	case Neg:
+		return simplifyNormaliza(xx.X)
+	}
+	return Neg{X: x}
+}
+
+// simplifyDiv pliega cocientes de constantes, elimina el denominador 1
+// y sube los signos del denominador.
+func simplifyDiv(n Div) Expr {
+	num, den := simplifyNormaliza(n.Num), simplifyNormaliza(n.Den)
+	if nf, ok := matchNum(num); ok {
+		if nf == 0 {
+			return Num{Text: "0"}
+		}
+		if df, ok := matchNum(den); ok && df != 0 {
+			return Num{Text: NumFromFloat(nf / df).Text}
+		}
+	}
+	if df, ok := matchNum(den); ok && df == 1 {
+		return num
+	}
+	if _, neg := den.(Neg); neg {
+		// el signo va arriba: a/(-b) → -(a/b)
+		return Neg{X: simplifyNormaliza(Div{Num: num, Den: den.(Neg).X})}
+	}
+	return Div{Num: num, Den: den}
+}
+
+// simplifyPow pliega potencias triviales (exponente 0/1/−1, base 1) y
+// potencias de constantes.
+func simplifyPow(n Pow) Expr {
+	base, exp := simplifyNormaliza(n.Base), simplifyNormaliza(n.Exp)
+	if ef, ok := matchNum(exp); ok {
+		switch ef {
+		case 0:
+			return Num{Text: "1"}
+		case 1:
+			return base
+		case -1:
+			// x^(-1) se muestra como 1/x
+			return Div{Num: Num{Text: "1"}, Den: base}
+		}
+		if bf, ok := matchNum(base); ok {
+			if v, valid := powFloat(bf, ef); valid {
+				return Num{Text: NumFromFloat(v).Text}
+			}
+		}
+	}
+	if bf, ok := matchNum(base); ok && bf == 1 {
+		return Num{Text: "1"}
+	}
+	return Pow{Base: base, Exp: exp}
+}
+
 // simplifyMulForzado aplana productos, fusiona potencias de la misma base
 // y agrupa los coeficientes numéricos en un solo factor.
 func simplifyMulForzado(n Mul) Expr {
+	facts, zero := flattenMul(n)
+	if zero {
+		return Num{Text: "0"}
+	}
+
+	coeff, rest := mergeMulBases(facts)
+
+	if coeff == 0 {
+		return Num{Text: "0"}
+	}
+	if len(rest) == 0 {
+		return Num{Text: NumFromFloat(coeff).Text}
+	}
+	switch {
+	case coeff == 1:
+		if len(rest) == 1 {
+			return rest[0]
+		}
+		return Mul{Factors: rest}
+	case coeff == -1:
+		if len(rest) == 1 {
+			return Neg{X: rest[0]}
+		}
+		return Neg{X: Mul{Factors: rest}}
+	default:
+		all := append([]Expr{Num{Text: NumFromFloat(coeff).Text}}, rest...)
+		return Mul{Factors: all}
+	}
+}
+
+// flattenMul simplifica cada factor y aplana los productos anidados.
+// El segundo valor indica si apareció un factor cero (anula el producto).
+func flattenMul(n Mul) ([]Expr, bool) {
 	var facts []Expr
 	for _, f := range n.Factors {
 		s := simplifyNormaliza(f)
@@ -235,11 +293,16 @@ func simplifyMulForzado(n Mul) Expr {
 			continue
 		}
 		if z, ok := matchNum(s); ok && z == 0 {
-			return Num{Text: "0"}
+			return nil, true
 		}
 		facts = append(facts, s)
 	}
+	return facts, false
+}
 
+// mergeMulBases agrupa factores con la misma base de potencia sumando
+// exponentes y acumula el coeficiente numérico en un solo valor.
+func mergeMulBases(facts []Expr) (float64, []Expr) {
 	coeff := 1.0
 	var rest []Expr
 	baseExp := map[string]float64{}
@@ -280,28 +343,7 @@ func simplifyMulForzado(n Mul) Expr {
 			rest = append(rest, Pow{Base: base, Exp: Num{Text: FormatFloatText(e)}})
 		}
 	}
-
-	if coeff == 0 {
-		return Num{Text: "0"}
-	}
-	if len(rest) == 0 {
-		return Num{Text: NumFromFloat(coeff).Text}
-	}
-	switch {
-	case coeff == 1:
-		if len(rest) == 1 {
-			return rest[0]
-		}
-		return Mul{Factors: rest}
-	case coeff == -1:
-		if len(rest) == 1 {
-			return Neg{X: rest[0]}
-		}
-		return Neg{X: Mul{Factors: rest}}
-	default:
-		all := append([]Expr{Num{Text: NumFromFloat(coeff).Text}}, rest...)
-		return Mul{Factors: all}
-	}
+	return coeff, rest
 }
 
 // --- derivada simbólica ---
@@ -342,46 +384,58 @@ func (d *deriver) derive(e Expr) (Expr, error) {
 	case Const:
 		return Num{Text: "0"}, nil
 	case Neg:
-		inner, err := d.derive(n.X)
-		if err != nil {
-			return nil, err
-		}
-		return Neg{X: inner}, nil
+		return d.deriveNeg(n)
 	case Add:
-		d.rule("regla de la suma sobre " + n.Ascii())
-		var parts []Expr
-		for _, t := range n.Terms {
-			dd, err := d.derive(t)
-			if err != nil {
-				return nil, err
-			}
-			parts = append(parts, dd)
-		}
-		return simplifyNormaliza(Add{Terms: parts}), nil
+		return d.deriveAdd(n)
 	case Mul:
 		return d.deriveMul(n)
 	case Div:
-		d.rule("regla del cociente: (u/v)′ = (u′v − uv′)/v²")
-		du, err := d.derive(n.Num)
-		if err != nil {
-			return nil, err
-		}
-		dv, err := d.derive(n.Den)
-		if err != nil {
-			return nil, err
-		}
-		num := Add{Terms: []Expr{
-			Mul{Factors: []Expr{du, n.Den}},
-			Neg{X: Mul{Factors: []Expr{n.Num, dv}}},
-		}}
-		den := Pow{Base: n.Den, Exp: Num{Text: "2"}}
-		return simplifyNormaliza(Div{Num: num, Den: den}), nil
+		return d.deriveDiv(n)
 	case Pow:
 		return d.derivePow(n)
 	case Call:
 		return d.deriveCall(n)
 	}
 	return nil, errors.New("derivada no soportada para este nodo")
+}
+
+func (d *deriver) deriveNeg(n Neg) (Expr, error) {
+	inner, err := d.derive(n.X)
+	if err != nil {
+		return nil, err
+	}
+	return Neg{X: inner}, nil
+}
+
+func (d *deriver) deriveAdd(n Add) (Expr, error) {
+	d.rule("regla de la suma sobre " + n.Ascii())
+	var parts []Expr
+	for _, t := range n.Terms {
+		dd, err := d.derive(t)
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, dd)
+	}
+	return simplifyNormaliza(Add{Terms: parts}), nil
+}
+
+func (d *deriver) deriveDiv(n Div) (Expr, error) {
+	d.rule("regla del cociente: (u/v)′ = (u′v − uv′)/v²")
+	du, err := d.derive(n.Num)
+	if err != nil {
+		return nil, err
+	}
+	dv, err := d.derive(n.Den)
+	if err != nil {
+		return nil, err
+	}
+	num := Add{Terms: []Expr{
+		Mul{Factors: []Expr{du, n.Den}},
+		Neg{X: Mul{Factors: []Expr{n.Num, dv}}},
+	}}
+	den := Pow{Base: n.Den, Exp: Num{Text: "2"}}
+	return simplifyNormaliza(Div{Num: num, Den: den}), nil
 }
 
 func (d *deriver) deriveMul(n Mul) (Expr, error) {
@@ -461,7 +515,7 @@ func (d *deriver) deriveCall(n Call) (Expr, error) {
 func Simplify(e Expr) (Expr, []string, error) {
 	orig := e.Ascii()
 	res := simplifyNormaliza(e)
-	steps := []string{}
+	var steps []string
 	if res.Ascii() != orig {
 		steps = append(steps,
 			"Agrupando términos semejantes y plegando constantes...",
@@ -652,66 +706,95 @@ func Integrate(e Expr, v byte) (Expr, []string, error) {
 
 // integrateTerm integra un término coeff·rest respecto a v.
 func integrateTerm(t symTerm, v byte) (symTerm, bool) {
-	c, rest := t.coeff, t.rest
-	if rest == nil {
-		return symTerm{coeff: c, rest: Var{Name: v}}, true
+	if t.rest == nil {
+		return symTerm{coeff: t.coeff, rest: Var{Name: v}}, true
 	}
-	switch n := rest.(type) {
+	switch n := t.rest.(type) {
 	case Var:
-		if n.Name == v {
-			// ∫ c·v dv = c·v²/2
-			return symTerm{coeff: c / 2, rest: Pow{Base: Var{Name: v}, Exp: Num{Text: "2"}}}, true
-		}
-		return symTerm{coeff: c, rest: Mul{Factors: []Expr{Var{Name: n.Name}, Var{Name: v}}}}, true
+		return integrateVar(t.coeff, n, v)
 	case Div:
-		if nf, ok := matchNum(n.Num); ok {
-			lead, deg, okd := asyDegree(n.Den, v)
-			if okd && deg > 0 {
-				// c/(lead·v^d) → (c/lead)·v^(−d) y se reaplica la regla
-				t2 := symTerm{
-					coeff: c * nf / lead,
-					rest:  Pow{Base: Var{Name: v}, Exp: Num{Text: FormatFloatText(-float64(deg))}},
-				}
-				return integrateTerm(t2, v)
-			}
-		}
-		if d, ok := n.Den.(Var); ok && d.Name == v {
-			// ∫ c/v dv = c·ln|v|
-			return symTerm{coeff: c, rest: Call{Name: "ln", Arg: Var{Name: v}}}, true
-		}
+		return integrateDiv(t, n, v)
 	case Pow:
-		if vn, ok := n.Base.(Var); ok && vn.Name == v {
-			if ef, err := numEval(n.Exp, v, 0); err == nil {
-				if ef == -1 {
-					// ∫ v⁻¹ = ln|v|
-					return symTerm{coeff: c, rest: Call{Name: "ln", Arg: Var{Name: v}}}, true
-				}
-				if ef == 0.5 {
-					// ∫√v = (2/3)·v·√v
-					return symTerm{
-						coeff: c * 2 / 3,
-						rest:  Mul{Factors: []Expr{Var{Name: v}, Call{Name: "sqrt", Arg: Var{Name: v}}}},
-					}, true
-				}
-				if ef != -1 {
-					return symTerm{
-						coeff: c / (ef + 1),
-						rest:  Pow{Base: Var{Name: v}, Exp: Num{Text: FormatFloatText(ef + 1)}},
-					}, true
-				}
-			}
-		}
+		return integratePow(t, n, v)
 	case Call:
-		switch n.Name {
-		case "sin":
-			if vn, ok := n.Arg.(Var); ok && vn.Name == v {
-				return symTerm{coeff: -c, rest: Call{Name: "cos", Arg: Var{Name: v}}}, true
+		return integrateCall(t.coeff, n, v)
+	}
+	return symTerm{}, false
+}
+
+// integrateVar integra c·x o c (variable distinta): ∫c·y dv = c·y·v.
+func integrateVar(c float64, n Var, v byte) (symTerm, bool) {
+	if n.Name == v {
+		// ∫ c·v dv = c·v²/2
+		return symTerm{coeff: c / 2, rest: Pow{Base: Var{Name: v}, Exp: Num{Text: "2"}}}, true
+	}
+	return symTerm{coeff: c, rest: Mul{Factors: []Expr{Var{Name: n.Name}, Var{Name: v}}}}, true
+}
+
+// integrateDiv integra cocientes: 1/(polinomio en v) se reescribe como
+// potencia negativa y ∫ c/v dv = c·ln|v|.
+func integrateDiv(t symTerm, n Div, v byte) (symTerm, bool) {
+	c := t.coeff
+	if nf, ok := matchNum(n.Num); ok {
+		lead, deg, okd := asyDegree(n.Den, v)
+		if okd && deg > 0 {
+			// c/(lead·v^d) → (c/lead)·v^(−d) y se reaplica la regla
+			t2 := symTerm{
+				coeff: c * nf / lead,
+				rest:  Pow{Base: Var{Name: v}, Exp: Num{Text: FormatFloatText(-float64(deg))}},
 			}
-		case "cos":
-			if vn, ok := n.Arg.(Var); ok && vn.Name == v {
-				return symTerm{coeff: c, rest: Call{Name: "sin", Arg: Var{Name: v}}}, true
-			}
+			return integrateTerm(t2, v)
 		}
+	}
+	if d, ok := n.Den.(Var); ok && d.Name == v {
+		// ∫ c/v dv = c·ln|v|
+		return symTerm{coeff: c, rest: Call{Name: "ln", Arg: Var{Name: v}}}, true
+	}
+	return symTerm{}, false
+}
+
+// integratePotencia aplica la regla de la potencia a c·v^e, con casos
+// especiales para e=−1 (logaritmo) y e=0.5 (raíz).
+func integratePow(t symTerm, n Pow, v byte) (symTerm, bool) {
+	vn, ok := n.Base.(Var)
+	if !ok || vn.Name != v {
+		return symTerm{}, false
+	}
+	ef, err := numEval(n.Exp, v, 0)
+	if err != nil {
+		return symTerm{}, false
+	}
+	switch ef {
+	case -1:
+		// ∫ v⁻¹ = ln|v|
+		return symTerm{coeff: t.coeff, rest: Call{Name: "ln", Arg: Var{Name: v}}}, true
+	case 0.5:
+		// ∫√v = (2/3)·v·√v
+		return symTerm{
+			coeff: t.coeff * 2 / 3,
+			rest:  Mul{Factors: []Expr{Var{Name: v}, Call{Name: "sqrt", Arg: Var{Name: v}}}},
+		}, true
+	}
+	// ∫ vᵉ dv = v^(e+1)/(e+1)
+	return symTerm{
+		coeff: t.coeff / (ef + 1),
+		rest:  Pow{Base: Var{Name: v}, Exp: Num{Text: FormatFloatText(ef + 1)}},
+	}, true
+}
+
+// integrateCall integra sin(v) y cos(v) con argumento exacto v.
+func integrateCall(c float64, n Call, v byte) (symTerm, bool) {
+	vn, ok := n.Arg.(Var)
+	if !ok || vn.Name != v {
+		return symTerm{}, false
+	}
+	switch n.Name {
+	case "sin":
+		// ∫ sin(v) dv = −cos(v)
+		return symTerm{coeff: -c, rest: Call{Name: "cos", Arg: Var{Name: v}}}, true
+	case "cos":
+		// ∫ cos(v) dv = sin(v)
+		return symTerm{coeff: c, rest: Call{Name: "sin", Arg: Var{Name: v}}}, true
 	}
 	return symTerm{}, false
 }
@@ -815,28 +898,9 @@ func asyDegree(e Expr, v byte) (lead float64, deg int, ok bool) {
 		l, d, o := asyDegree(n.X, v)
 		return -l, d, o
 	case Add:
-		bestL, bestD := 0.0, math.MinInt
-		for _, t := range n.Terms {
-			l, d, o := asyDegree(t, v)
-			if !o {
-				return 0, 0, false
-			}
-			if d > bestD {
-				bestL, bestD = l, d
-			}
-		}
-		return bestL, bestD, true
+		return asyDegreeAdd(n, v)
 	case Mul:
-		lead, deg := 1.0, 0
-		for _, f := range n.Factors {
-			l, d, o := asyDegree(f, v)
-			if !o {
-				return 0, 0, false
-			}
-			lead *= l
-			deg += d
-		}
-		return lead, deg, true
+		return asyDegreeMul(n, v)
 	case Div:
 		ln, dn, lo := asyDegree(n.Num, v)
 		ld, dd, do := asyDegree(n.Den, v)
@@ -845,25 +909,57 @@ func asyDegree(e Expr, v byte) (lead float64, deg int, ok bool) {
 		}
 		return ln / ld, dn - dd, true
 	case Pow:
-		if b, ok := n.Base.(Var); ok && b.Name == v {
-			if ef, err := numEval(n.Exp, v, 0); err == nil {
-				return 1, int(ef), true
-			}
-		}
-		if _, ok := n.Base.(Num); ok {
-			if f, err := numEval(n.Base, v, 0); err == nil {
-				return math.Pow(f, 0), 0, true
-			}
-		}
-		if b, ok := n.Base.(Const); ok && b.Name == "inf" {
-			return 0, 0, false
-		}
-		return 0, 0, false
+		return asyDegreePow(n, v)
 	case Call:
 		if isVarIn(n, v) {
 			return 0, 0, false
 		}
 		return 1, 0, true
+	}
+	return 0, 0, false
+}
+
+// asyDegreeAdd toma el término dominante (mayor grado) de la suma.
+func asyDegreeAdd(n Add, v byte) (float64, int, bool) {
+	bestL, bestD := 0.0, math.MinInt
+	for _, t := range n.Terms {
+		l, d, o := asyDegree(t, v)
+		if !o {
+			return 0, 0, false
+		}
+		if d > bestD {
+			bestL, bestD = l, d
+		}
+	}
+	return bestL, bestD, true
+}
+
+// asyDegreeMul multiplica coeficientes y suma grados de los factores.
+func asyDegreeMul(n Mul, v byte) (float64, int, bool) {
+	lead, deg := 1.0, 0
+	for _, f := range n.Factors {
+		l, d, o := asyDegree(f, v)
+		if !o {
+			return 0, 0, false
+		}
+		lead *= l
+		deg += d
+	}
+	return lead, deg, true
+}
+
+// asyDegreePow estima v^e con exponente numérico; el resto no es
+// polinómico y no se soporta.
+func asyDegreePow(n Pow, v byte) (float64, int, bool) {
+	if b, ok := n.Base.(Var); ok && b.Name == v {
+		if ef, err := numEval(n.Exp, v, 0); err == nil {
+			return 1, int(ef), true
+		}
+	}
+	if _, ok := n.Base.(Num); ok {
+		if f, err := numEval(n.Base, v, 0); err == nil {
+			return math.Pow(f, 0), 0, true
+		}
 	}
 	return 0, 0, false
 }
@@ -887,61 +983,81 @@ func numEval(e Expr, v byte, a float64) (float64, error) {
 		x, err := numEval(n.X, v, a)
 		return -x, err
 	case Add:
-		sum := 0.0
-		for _, t := range n.Terms {
-			x, err := numEval(t, v, a)
-			if err != nil {
-				return 0, err
-			}
-			sum += x
-		}
-		return sum, nil
+		return numEvalAdd(n, v, a)
 	case Mul:
-		prod := 1.0
-		for _, f := range n.Factors {
-			x, err := numEval(f, v, a)
-			if err != nil {
-				return 0, err
-			}
-			prod *= x
-		}
-		return prod, nil
+		return numEvalMul(n, v, a)
 	case Div:
-		num, err := numEval(n.Num, v, a)
-		if err != nil {
-			return 0, err
-		}
-		den, err := numEval(n.Den, v, a)
-		if err != nil {
-			return 0, err
-		}
-		return num / den, nil
+		return numEvalDiv(n, v, a)
 	case Pow:
-		b, err := numEval(n.Base, v, a)
-		if err != nil {
-			return 0, err
-		}
-		xp, err := numEval(n.Exp, v, a)
-		if err != nil {
-			return 0, err
-		}
-		return math.Pow(b, xp), nil
+		return numEvalPow(n, v, a)
 	case Call:
-		x, err := numEval(n.Arg, v, a)
-		if err != nil {
-			return 0, err
-		}
-		switch n.Name {
-		case "sqrt":
-			return math.Sqrt(x), nil
-		case "sin":
-			return math.Sin(x), nil
-		case "cos":
-			return math.Cos(x), nil
-		case "abs":
-			return math.Abs(x), nil
-		}
-		return 0, fmt.Errorf("%s() sin evaluación numérica", n.Name)
+		return numEvalCall(n, v, a)
 	}
 	return 0, errors.New("evaluación numérica no soportada")
+}
+
+func numEvalAdd(n Add, v byte, a float64) (float64, error) {
+	sum := 0.0
+	for _, t := range n.Terms {
+		x, err := numEval(t, v, a)
+		if err != nil {
+			return 0, err
+		}
+		sum += x
+	}
+	return sum, nil
+}
+
+func numEvalMul(n Mul, v byte, a float64) (float64, error) {
+	prod := 1.0
+	for _, f := range n.Factors {
+		x, err := numEval(f, v, a)
+		if err != nil {
+			return 0, err
+		}
+		prod *= x
+	}
+	return prod, nil
+}
+
+func numEvalDiv(n Div, v byte, a float64) (float64, error) {
+	num, err := numEval(n.Num, v, a)
+	if err != nil {
+		return 0, err
+	}
+	den, err := numEval(n.Den, v, a)
+	if err != nil {
+		return 0, err
+	}
+	return num / den, nil
+}
+
+func numEvalPow(n Pow, v byte, a float64) (float64, error) {
+	b, err := numEval(n.Base, v, a)
+	if err != nil {
+		return 0, err
+	}
+	xp, err := numEval(n.Exp, v, a)
+	if err != nil {
+		return 0, err
+	}
+	return math.Pow(b, xp), nil
+}
+
+func numEvalCall(n Call, v byte, a float64) (float64, error) {
+	x, err := numEval(n.Arg, v, a)
+	if err != nil {
+		return 0, err
+	}
+	switch n.Name {
+	case "sqrt":
+		return math.Sqrt(x), nil
+	case "sin":
+		return math.Sin(x), nil
+	case "cos":
+		return math.Cos(x), nil
+	case "abs":
+		return math.Abs(x), nil
+	}
+	return 0, fmt.Errorf("%s() sin evaluación numérica", n.Name)
 }

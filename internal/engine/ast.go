@@ -158,8 +158,7 @@ func mulFactorAscii(f Expr) string {
 
 func (e Div) Ascii() string {
 	num, den := e.Num.Ascii(), e.Den.Ascii()
-	switch e.Num.(type) {
-	case Add:
+	if _, ok := e.Num.(Add); ok {
 		num = "(" + num + ")"
 	}
 	switch e.Den.(type) {

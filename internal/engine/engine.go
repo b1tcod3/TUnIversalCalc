@@ -23,16 +23,9 @@ func Evaluate(decl Decl, cmd, varName string) ([]string, error) {
 		varName = "x"
 	}
 
-	op := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(cmd, "/")))
-	op = strings.NewReplacer("(", "", ")", "", ",", "").Replace(op)
-	op = strings.TrimSpace(op)
+	op := normalizeOp(cmd)
 	if op == "" {
 		return nil, errors.New("comando vacío en el panel 2")
-	}
-
-	pretty, latex := decl.Pretty, decl.Latex
-	steps := []string{
-		"Objeto: " + decl.Nombre + "  —  " + latex,
 	}
 
 	// Una variable simbólica se representa con una sola letra. Si el
@@ -43,84 +36,43 @@ func Evaluate(decl Decl, cmd, varName string) ([]string, error) {
 		v = varName[0]
 	}
 
+	steps := []string{
+		"Objeto: " + decl.Nombre + "  —  " + decl.Latex,
+	}
+	tail, err := evalOp(decl, op, cmd, v)
+	if err != nil {
+		return nil, err
+	}
+	return append(steps, tail...), nil
+}
+
+// normalizeOp limpia el comando del panel 2: minúsculas, sin "/" inicial
+// ni paréntesis o comas.
+func normalizeOp(cmd string) string {
+	op := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(cmd, "/")))
+	op = strings.NewReplacer("(", "", ")", "", ",", "").Replace(op)
+	return strings.TrimSpace(op)
+}
+
+// evalOp despacha la operación reconocida y devuelve los pasos que siguen
+// a la cabecera común del objeto.
+func evalOp(decl Decl, op, cmd string, v byte) ([]string, error) {
 	switch {
 	case strings.HasPrefix(op, "integral"):
-		expr, err := parseContent(decl)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, "Operación: integral indefinida respecto a "+string(v))
-		res, sir, err := Integrate(expr, v)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, sir...)
-		steps = append(steps,
-			"∫ ("+pretty+") d"+string(v)+"  →  "+res.Ascii()+" + C")
-
+		return evalIntegral(decl, v)
 	case strings.HasPrefix(op, "deriv"):
-		expr, err := parseContent(decl)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, "Operación: derivada respecto a "+string(v))
-		res, dr, err := Derive(expr, v)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, dr...)
-		steps = append(steps,
-			"d/d"+string(v)+" ("+pretty+")  →  "+decl.Nombre+"′("+string(v)+") = "+res.Ascii())
-
+		return evalDerivada(decl, v)
 	case strings.HasPrefix(op, "limit"):
-		expr, err := parseContent(decl)
-		if err != nil {
-			return nil, err
-		}
-		target, err := limitTarget(cmd)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, "Operación: límite")
-		res, lr, err := Limit(expr, v, target)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, lr...)
-		steps = append(steps,
-			"lim "+string(v)+"→"+target.String()+" ("+pretty+")  →  "+res.Ascii())
-
+		return evalLimite(decl, cmd, v)
 	case strings.HasPrefix(op, "resolver"):
-		steps = append(steps, "Operación: resolver ecuación")
-		lhs, rhs, err := parseDeclEquation(decl)
-		if err != nil {
-			return nil, err
-		}
-		sr, err := Solve(lhs, rhs, v)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, sr...)
-
+		return evalResolver(decl, v)
 	case strings.HasPrefix(op, "simplificar"):
-		expr, err := parseContent(decl)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, "Operación: simplificar")
-		res, ps, err := Simplify(expr)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, ps...)
-		steps = append(steps, "Resultado: "+res.Ascii())
-
+		return evalSimplificar(decl)
 	case strings.HasPrefix(op, "matriz"):
-		steps = append(steps,
+		return []string{
 			"Operación: matriz",
 			"El parser simbólico aún no soporta matrices: declara un sistema como /ecuacion o usa una operación escalar",
-		)
-
+		}, nil
 	default:
 		name := op
 		if f := strings.Fields(op); len(f) > 0 {
@@ -131,8 +83,83 @@ func Evaluate(decl Decl, cmd, varName string) ([]string, error) {
 			name,
 		)
 	}
+}
 
+func evalIntegral(decl Decl, v byte) ([]string, error) {
+	expr, err := parseContent(decl)
+	if err != nil {
+		return nil, err
+	}
+	steps := []string{"Operación: integral indefinida respecto a " + string(v)}
+	res, sir, err := Integrate(expr, v)
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, sir...)
+	steps = append(steps,
+		"∫ ("+decl.Pretty+") d"+string(v)+"  →  "+res.Ascii()+" + C")
 	return steps, nil
+}
+
+func evalDerivada(decl Decl, v byte) ([]string, error) {
+	expr, err := parseContent(decl)
+	if err != nil {
+		return nil, err
+	}
+	steps := []string{"Operación: derivada respecto a " + string(v)}
+	res, dr, err := Derive(expr, v)
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, dr...)
+	steps = append(steps,
+		"d/d"+string(v)+" ("+decl.Pretty+")  →  "+decl.Nombre+"′("+string(v)+") = "+res.Ascii())
+	return steps, nil
+}
+
+func evalLimite(decl Decl, cmd string, v byte) ([]string, error) {
+	expr, err := parseContent(decl)
+	if err != nil {
+		return nil, err
+	}
+	target, err := limitTarget(cmd)
+	if err != nil {
+		return nil, err
+	}
+	steps := []string{"Operación: límite"}
+	res, lr, err := Limit(expr, v, target)
+	if err != nil {
+		return nil, err
+	}
+	steps = append(steps, lr...)
+	steps = append(steps,
+		"lim "+string(v)+"→"+target.String()+" ("+decl.Pretty+")  →  "+res.Ascii())
+	return steps, nil
+}
+
+func evalResolver(decl Decl, v byte) ([]string, error) {
+	lhs, rhs, err := parseDeclEquation(decl)
+	if err != nil {
+		return nil, err
+	}
+	sr, err := Solve(lhs, rhs, v)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string{"Operación: resolver ecuación"}, sr...), nil
+}
+
+func evalSimplificar(decl Decl) ([]string, error) {
+	expr, err := parseContent(decl)
+	if err != nil {
+		return nil, err
+	}
+	res, ps, err := Simplify(expr)
+	if err != nil {
+		return nil, err
+	}
+	steps := append([]string{"Operación: simplificar"}, ps...)
+	return append(steps, "Resultado: "+res.Ascii()), nil
 }
 
 // parseContent valida y parsea el contenido del objeto (función o expresión).

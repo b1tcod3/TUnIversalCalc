@@ -137,42 +137,18 @@ func (p *parser) parseNud() (Expr, error) {
 	case TokConst:
 		return Const{Name: t.Text}, nil
 	case TokFunc:
-		if p.peek().Kind != TokLParen {
-			return nil, fmt.Errorf("se esperaba '(' tras %s (posición %d)", t.Text, t.Pos)
-		}
-		p.next()
-		arg, err := p.parseExpr(0)
-		if err != nil {
-			return nil, err
-		}
-		closing := p.peek()
-		if closing.Kind != TokRParen {
-			return nil, fmt.Errorf("se esperaba ')' tras el argumento de %s (posición %d)", t.Text, closing.Pos)
-		}
-		p.next()
-		return Call{Name: t.Text, Arg: arg}, nil
+		return p.parseFuncCall(t)
 	case TokOp:
-		switch t.Text {
-		case "-":
-			operand, err := p.parseExpr(bpUnary)
-			if err != nil {
-				return nil, err
-			}
-			return Neg{X: operand}, nil
-		default:
+		if t.Text != "-" {
 			return nil, fmt.Errorf("operador %q sin operando izquierdo (posición %d)", t.Text, t.Pos)
 		}
-	case TokLParen:
-		inner, err := p.parseExpr(0)
+		operand, err := p.parseExpr(bpUnary)
 		if err != nil {
 			return nil, err
 		}
-		closing := p.peek()
-		if closing.Kind != TokRParen {
-			return nil, fmt.Errorf("paréntesis sin cerrar: se esperaba ')' en la posición %d", closing.Pos)
-		}
-		p.next()
-		return inner, nil
+		return Neg{X: operand}, nil
+	case TokLParen:
+		return p.parseGroup()
 	case TokRParen:
 		return nil, fmt.Errorf("')' sobrante (posición %d)", t.Pos)
 	case TokEq:
@@ -180,6 +156,38 @@ func (p *parser) parseNud() (Expr, error) {
 	default:
 		return nil, errors.New("expresión vacía o falta un operando")
 	}
+}
+
+// parseFuncCall consume func(arg) completo tras reconocer el nombre.
+func (p *parser) parseFuncCall(t Token) (Expr, error) {
+	if p.peek().Kind != TokLParen {
+		return nil, fmt.Errorf("se esperaba '(' tras %s (posición %d)", t.Text, t.Pos)
+	}
+	p.next()
+	arg, err := p.parseExpr(0)
+	if err != nil {
+		return nil, err
+	}
+	closing := p.peek()
+	if closing.Kind != TokRParen {
+		return nil, fmt.Errorf("se esperaba ')' tras el argumento de %s (posición %d)", t.Text, closing.Pos)
+	}
+	p.next()
+	return Call{Name: t.Text, Arg: arg}, nil
+}
+
+// parseGroup consume (expr) y devuelve la expresión interior.
+func (p *parser) parseGroup() (Expr, error) {
+	inner, err := p.parseExpr(0)
+	if err != nil {
+		return nil, err
+	}
+	closing := p.peek()
+	if closing.Kind != TokRParen {
+		return nil, fmt.Errorf("paréntesis sin cerrar: se esperaba ')' en la posición %d", closing.Pos)
+	}
+	p.next()
+	return inner, nil
 }
 
 // opBP devuelve la precedencia y cómo se lee el lado derecho:
