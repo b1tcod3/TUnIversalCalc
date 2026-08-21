@@ -107,8 +107,7 @@ func TestFlowDeclararYOperar(t *testing.T) {
 
 	// Escribir /ecuacion 2x+2=0 y Enter -> auto-e1 registrada, foco al panel 2
 	m.declInput.SetValue("/ecuacion 2x+2=0")
-	nm, _ := m.handleEnter()
-	m = nm.(Model)
+	m.handleEnter()
 	if d, ok := m.objs["e1"]; !ok || d.Tipo != engine.DeclEcuacion || d.Latex != "2x + 2 = 0" {
 		t.Fatalf("e1 no registrada correctamente: %+v", m.objs)
 	}
@@ -120,20 +119,19 @@ func TestFlowDeclararYOperar(t *testing.T) {
 	}
 
 	// Tab desde el panel 2 vuelve al 1; sin objetos, Tab desde 1 se bloquea
-	m = m.switchPanel()
+	m.switchPanel()
 	if m.focus != FocusDecl {
 		t.Fatal("Tab debe devolver el foco al panel 1")
 	}
 	m2 := NewModel()
-	m2 = m2.switchPanel()
+	m2.switchPanel()
 	if m2.focus != FocusDecl {
 		t.Fatal("Tab no debe habilitar el panel 2 sin objetos declarados")
 	}
 
 	// Segunda declaración: /funcion 2x+2 -> auto-f1, es el último objeto
 	m.declInput.SetValue("/funcion 2x+2")
-	nm, _ = m.handleEnter()
-	m = nm.(Model)
+	m.handleEnter()
 	if d, ok := m.objs["f1"]; !ok || d.Tipo != engine.DeclFuncion {
 		t.Fatalf("f1 no registrada: %+v", m.objs)
 	}
@@ -143,8 +141,7 @@ func TestFlowDeclararYOperar(t *testing.T) {
 
 	// /resolver x -> opera sobre el último objeto (f1)
 	m.cmdInput.SetValue("/resolver x")
-	nm, cmd := m.handleEnter()
-	m = nm.(Model)
+	cmd := m.handleEnter()
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
 	}
@@ -163,8 +160,7 @@ func TestFlowDeclararYOperar(t *testing.T) {
 
 	// /resolver e1 x -> objeto explícito con variable
 	m.cmdInput.SetValue("/resolver e1 x")
-	nm, cmd = m.handleEnter()
-	m = nm.(Model)
+	cmd = m.handleEnter()
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
 	}
@@ -175,8 +171,7 @@ func TestFlowDeclararYOperar(t *testing.T) {
 
 	// Error inteligente: objeto inexistente
 	m.cmdInput.SetValue("/resolver g1")
-	nm, cmd = m.handleEnter()
-	m = nm.(Model)
+	cmd = m.handleEnter()
 	if cmd != nil {
 		t.Fatal("no debe lanzarse comando con objeto inexistente")
 	}
@@ -187,8 +182,7 @@ func TestFlowDeclararYOperar(t *testing.T) {
 
 	// Error del motor: operación no reconocida
 	m.cmdInput.SetValue("/voltear e1")
-	nm, cmd = m.handleEnter()
-	m = nm.(Model)
+	cmd = m.handleEnter()
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
 	}
@@ -199,18 +193,16 @@ func TestFlowDeclararYOperar(t *testing.T) {
 	}
 
 	// Plantilla de declaración en el panel 1: "/ecu" -> "/ecuacion ?"
-	m = m.switchPanel()
+	m.switchPanel()
 	m.declInput.SetValue("/ecu")
-	nm, _ = m.handleEnter()
-	m = nm.(Model)
+	m.handleEnter()
 	if m.declInput.Value() != "/ecuacion " {
 		t.Fatalf("plantilla no insertada: %q", m.declInput.Value())
 	}
 
 	// Declaración inválida: error en log y sin bloqueo posterior
 	m.declInput.SetValue("/funcion x=2")
-	nm, _ = m.handleEnter()
-	m = nm.(Model)
+	m.handleEnter()
 	last = m.outputLog[len(m.outputLog)-1]
 	if last.Level != LevelError || !strings.Contains(last.Content, "no lleva") {
 		t.Fatalf("error esperado por '=' en función: %+v", last)

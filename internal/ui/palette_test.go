@@ -168,8 +168,7 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	}
 
 	// Enter inserta la plantilla en el panel 1 y cierra
-	nm, _ := m.paletteSelect()
-	m = nm.(Model)
+	m.paletteSelect()
 	if m.declInput.Value() != "/funcion " {
 		t.Fatalf("plantilla no insertada: %q", m.declInput.Value())
 	}
@@ -234,8 +233,7 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	if !m.palette.Open || !reflect.DeepEqual(names(m.palette.List), []string{"resolver"}) {
 		t.Fatalf("paleta panel 2 incorrecta: open=%v %v", m.palette.Open, names(m.palette.List))
 	}
-	nm, _ = m.paletteSelect()
-	m = nm.(Model)
+	m.paletteSelect()
 	if m.cmdInput.Value() != "/resolver  ?" {
 		t.Fatalf("plantilla de operación no insertada: %q", m.cmdInput.Value())
 	}
@@ -246,7 +244,7 @@ func TestPaletteOpenCloseYSeleccion(t *testing.T) {
 	if !m.palette.Open {
 		t.Fatal("paleta panel 2 debe estar abierta")
 	}
-	m = m.switchPanel()
+	m.switchPanel()
 	if m.palette.Open {
 		t.Fatal("cambiar de panel debe cerrar la paleta")
 	}

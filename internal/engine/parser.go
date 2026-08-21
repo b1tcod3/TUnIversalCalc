@@ -145,9 +145,9 @@ func (p *parser) parseNud() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		close := p.peek()
-		if close.Kind != TokRParen {
-			return nil, fmt.Errorf("se esperaba ')' tras el argumento de %s (posición %d)", t.Text, close.Pos)
+		closing := p.peek()
+		if closing.Kind != TokRParen {
+			return nil, fmt.Errorf("se esperaba ')' tras el argumento de %s (posición %d)", t.Text, closing.Pos)
 		}
 		p.next()
 		return Call{Name: t.Text, Arg: arg}, nil
@@ -167,9 +167,9 @@ func (p *parser) parseNud() (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		close := p.peek()
-		if close.Kind != TokRParen {
-			return nil, fmt.Errorf("paréntesis sin cerrar: se esperaba ')' en la posición %d", close.Pos)
+		closing := p.peek()
+		if closing.Kind != TokRParen {
+			return nil, fmt.Errorf("paréntesis sin cerrar: se esperaba ')' en la posición %d", closing.Pos)
 		}
 		p.next()
 		return inner, nil

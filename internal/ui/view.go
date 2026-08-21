@@ -10,7 +10,7 @@ import (
 	"tuniversalcalc/internal/engine"
 )
 
-func (m Model) View() string {
+func (m *Model) View() string {
 	// Antes del primer WindowSizeMsg usamos dimensiones por defecto
 	if m.width == 0 || m.height == 0 {
 		m.width, m.height = 100, 28
@@ -69,14 +69,15 @@ func (m Model) View() string {
 	return grid + "\n" + help + "\n" + statusStyle.Render(clampWidth(m.statusBar(), m.width))
 }
 
-// clampWidth trunca una cadena plana (sin ANSI) para que quepa en max
+// clampWidth trunca una cadena plana (sin ANSI) para que quepa en maxW
 // columnas, añadiendo "…" cuando recorta.
-func clampWidth(s string, max int) string {
-	if max <= 1 {
+func clampWidth(s string, maxW int) string {
+	if maxW <= 1 {
 		return ""
 	}
-	if w := len([]rune(s)); w > max {
-		return string([]rune(s)[:max-1]) + "…"
+	r := []rune(s)
+	if w := len(r); w > maxW {
+		return string(r[:maxW-1]) + "…"
 	}
 	return s
 }

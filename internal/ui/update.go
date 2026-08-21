@@ -10,7 +10,7 @@ import (
 	"tuniversalcalc/internal/engine"
 )
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -41,7 +41,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.paletteDown()
 				return m, nil
 			case tea.KeyEnter:
-				return m.paletteSelect()
+				m.paletteSelect()
+				return m, nil
 			case tea.KeyEsc:
 				m.closePalette()
 				return m, nil
@@ -56,7 +57,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Navegación entre paneles
 		case tea.KeyTab:
-			return m.switchPanel(), nil
+			m.switchPanel()
+			return m, nil
 
 		// Salto de campo dentro de una plantilla (ambos paneles)
 		case tea.KeyShiftTab:
@@ -75,7 +77,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyEnter:
-			return m.handleEnter()
+			cmd := m.handleEnter()
+			return m, cmd
 
 		// Historial navegable en el panel de comando
 		case tea.KeyUp:
@@ -114,25 +117,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 //     salta al panel 2.
 //   - Comando: si matchea una plantilla la inserta; si no, resuelve el
 //     objeto (por nombre o el último) y ejecuta el motor.
-func (m Model) handleEnter() (tea.Model, tea.Cmd) {
+func (m *Model) handleEnter() tea.Cmd {
 	switch m.focus {
 	case FocusDecl:
 		raw := strings.TrimSpace(m.declInput.Value())
 		if raw == "" {
 			m.addLog(LevelInfo, "Declara un objeto: /ecuacion 2x+2=0, /funcion 2x+2 o /expresion x^2+1")
-			return m, nil
+			return nil
 		}
 		if tpl, ok := matchTemplate(declRegistry, raw); ok {
 			val, pos := JumpNextField(tpl.InsertText, 0)
 			m.declInput.SetValue(val)
 			m.declInput.SetCursor(pos)
 			m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
-			return m, nil
+			return nil
 		}
 		d, err := engine.ParseDecl(raw)
 		if err != nil {
 			m.addLog(LevelError, err.Error())
-			return m, nil
+			return nil
 		}
 		d.Nombre = m.autoName(d.Tipo)
 		m.objs[d.Nombre] = d
@@ -141,33 +144,34 @@ func (m Model) handleEnter() (tea.Model, tea.Cmd) {
 		m.tabHinted = false
 		m.addLog(LevelSuccess, d.Nombre+" declarada: "+d.Latex)
 		m.addLog(LevelStep, d.Pretty)
-		return m.switchPanel(), nil
+		m.switchPanel()
+		return nil
 
 	case FocusCmd:
 		if !m.declValid {
-			return m, nil
+			return nil
 		}
 		if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
 			val, pos := JumpNextField(tpl.InsertText, 0)
 			m.cmdInput.SetValue(val)
 			m.cmdInput.SetCursor(pos)
 			m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
-			return m, nil
+			return nil
 		}
 
 		val := strings.TrimSpace(m.cmdInput.Value())
 		if val == "" {
-			return m, nil
+			return nil
 		}
 		decl, varName, ok := m.resolveTarget(val)
 		if !ok {
-			return m, nil
+			return nil
 		}
 		m.pushHistory(val)
 		m.addLog(LevelInfo, fmt.Sprintf("Comando: %s  (objeto: %s = %s)", val, decl.Nombre, decl.Latex))
-		return m, evaluateCmd(decl, val, varName)
+		return evaluateCmd(decl, val, varName)
 	}
-	return m, nil
+	return nil
 }
 
 // resolveTarget averigua sobre qué objeto y variable opera el comando:
@@ -212,7 +216,7 @@ func (m *Model) autoName(t engine.DeclType) string {
 	return fmt.Sprintf("%s%d", t.Prefix(), m.counters[t])
 }
 
-func (m Model) switchPanel() Model {
+func (m *Model) switchPanel() {
 	m.closePalette() // cambiar de panel cierra la paleta
 	switch m.focus {
 	case FocusDecl:
@@ -222,7 +226,7 @@ func (m Model) switchPanel() Model {
 				m.tabHinted = true
 				m.addLog(LevelInfo, "Panel 2 bloqueado: declara un objeto en el panel 1 y pulsa Enter")
 			}
-			return m
+			return
 		}
 		m.focus = FocusCmd
 		m.declInput.Blur()
@@ -232,7 +236,6 @@ func (m Model) switchPanel() Model {
 		m.cmdInput.Blur()
 		m.declInput.Focus()
 	}
-	return m
 }
 
 // --- Historial del panel de comando ---
@@ -384,5 +387,3 @@ func (m Model) gridAvailable() int {
 	}
 	return 1
 }
-
-func _init() {}

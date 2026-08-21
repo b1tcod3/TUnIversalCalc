@@ -94,11 +94,6 @@ func (n Num) isZero() bool {
 	return err == nil && f == 0
 }
 
-func (n Num) isOne() bool {
-	f, err := n.Float()
-	return err == nil && f == 1
-}
-
 func (n Num) isNeg() bool {
 	return strings.HasPrefix(n.Text, "-")
 }

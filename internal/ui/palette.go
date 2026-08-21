@@ -3,7 +3,6 @@ package ui
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
@@ -137,7 +136,7 @@ func (m *Model) paletteDown() {
 }
 
 // paletteSelect inserta la plantilla seleccionada y cierra la paleta.
-func (m Model) paletteSelect() (tea.Model, tea.Cmd) {
+func (m *Model) paletteSelect() {
 	tpl := m.palette.List[m.palette.Sel]
 	m.closePalette()
 	val, pos := JumpNextField(tpl.InsertText, 0)
@@ -149,7 +148,6 @@ func (m Model) paletteSelect() (tea.Model, tea.Cmd) {
 		m.cmdInput.SetCursor(pos)
 	}
 	m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
-	return m, nil
 }
 
 // paletteView pinta las filas visibles de la paleta (sin salto final):

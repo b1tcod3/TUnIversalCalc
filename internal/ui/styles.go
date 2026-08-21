@@ -42,18 +42,6 @@ var (
 				BorderForeground(lipgloss.Color(colorOutput))
 )
 
-var panelHeaderStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color(colorInactive)).
-	Bold(true)
-
-func panelHeader(title string) string {
-	return panelHeaderStyle.Render(title)
-}
-
-// Título de panel alineado a la derecha (emulación de Title de lipgloss,
-// no disponible en v1.1.0): se coloca en la primera fila interior, pegado
-// al borde superior derecho. Si no cabe, se abrevia; si ni eso, se omite
-// (evita que el título envuelva en varias líneas e infle la altura).
 var titleRightStyle = lipgloss.NewStyle().
 	Bold(true)
 

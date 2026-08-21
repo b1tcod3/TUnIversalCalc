@@ -44,11 +44,6 @@ func matchTemplate(list []Template, input string) (Template, bool) {
 	return Template{}, false
 }
 
-// MatchTemplate busca en el registro de operaciones (panel 2).
-func MatchTemplate(input string) (Template, bool) {
-	return matchTemplate(opsRegistry, input)
-}
-
 // HasFields indica si la plantilla aún tiene marcadores "?" por completar.
 func HasFields(val string) bool {
 	return strings.Contains(val, "?")

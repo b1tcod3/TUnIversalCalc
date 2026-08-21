@@ -92,7 +92,7 @@ func Evaluate(decl Decl, cmd, varName string) ([]string, error) {
 
 	case strings.HasPrefix(op, "resolver"):
 		steps = append(steps, "Operación: resolver ecuación")
-		lhs, rhs, err := parseEquation(decl)
+		lhs, rhs, err := parseDeclEquation(decl)
 		if err != nil {
 			return nil, err
 		}
@@ -143,8 +143,8 @@ func parseContent(decl Decl) (Expr, error) {
 	return ParseExpr(decl.Raw)
 }
 
-// parseEquation valida y parsea una ecuación para su resolución.
-func parseEquation(decl Decl) (Expr, Expr, error) {
+// parseDeclEquation valida y parsea una ecuación para su resolución.
+func parseDeclEquation(decl Decl) (Expr, Expr, error) {
 	if decl.Tipo != DeclEcuacion {
 		expr, err := ParseExpr(decl.Raw)
 		if err != nil {
