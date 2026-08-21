@@ -99,6 +99,6 @@ func NewModel() Model {
 	return m
 }
 
-func (m Model) Init() tea.Cmd {
+func (Model) Init() tea.Cmd {
 	return textinput.Blink
 }

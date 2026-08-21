@@ -25,7 +25,7 @@ func (m Model) View() string {
 	if m.focus == FocusDecl {
 		exprStyle = exprPanelActive
 	}
-	exprStyle = exprStyle.Copy().Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
+	exprStyle = exprStyle.Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
 	exprBody := m.declInput.View()
 	if m.palette.Open && m.palette.Anchor == FocusDecl {
 		exprBody += "\n\n" + m.paletteView()
@@ -46,11 +46,11 @@ func (m Model) View() string {
 	if m.focus == FocusCmd && m.declValid {
 		calcStyle = calcPanelActive
 	}
-	calcStyle = calcStyle.Copy().Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
+	calcStyle = calcStyle.Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
 	panel2 := calcStyle.Render(titleRight(" 2. Operación/Comando ", " Comando ", colorCalcActive, innerL) + "\n\n" + calcContent)
 
 	// --- PANEL 3: VISTA / PASO A PASO (derecha) ---
-	panel3 := outputPanelStyle.Copy().
+	panel3 := outputPanelStyle.
 		Width(rw - chromeOutW).
 		Height(m.rightHeight() - chromeOutH).
 		Render(m.panel3Header(innerR) + m.output.View())

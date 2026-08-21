@@ -20,25 +20,25 @@ const (
 var basePanel = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder())
 
-var inputPanel = basePanel.Copy().
+var inputPanel = basePanel.
 	Padding(0, 1)
 
-var outputPanel = basePanel.Copy().
+var outputPanel = basePanel.
 	Padding(1)
 
 // Variantes estáticas activo/inactivo — nunca se mutan desde View().
 var (
-	exprPanelInactive = inputPanel.Copy().
+	exprPanelInactive = inputPanel.
 				BorderForeground(lipgloss.Color(colorInactive))
-	exprPanelActive = inputPanel.Copy().
+	exprPanelActive = inputPanel.
 			BorderForeground(lipgloss.Color(colorExprActive))
 
-	calcPanelInactive = inputPanel.Copy().
+	calcPanelInactive = inputPanel.
 				BorderForeground(lipgloss.Color(colorInactive))
-	calcPanelActive = inputPanel.Copy().
+	calcPanelActive = inputPanel.
 			BorderForeground(lipgloss.Color(colorCalcActive))
 
-	outputPanelStyle = outputPanel.Copy().
+	outputPanelStyle = outputPanel.
 				BorderForeground(lipgloss.Color(colorOutput))
 )
 
