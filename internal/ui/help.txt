@@ -1,0 +1,65 @@
+TUnIversalCalc — calculadora TUI
+================================
+
+Flujo rápido
+------------
+1. En el panel 1 declara un objeto con un slash-command.
+2. Pulsa Enter: el objeto se guarda con auto-nombre.
+3. En el panel 2 escribe la operación sobre ese objeto.
+4. La salida paso a paso aparece en el panel derecho.
+
+Panel 1 — declaración
+---------------------
+  /puntos (1,2) (3,4) (5,6)   Puntos para interpolar
+  /funcion 2x+2               Función sin "="
+  /expresion x^2+1            Expresión sin "="
+  /ecuacion 2x+2=0            Ecuación con un "="
+
+Auto-nombres: e1 (ecuación), f1 (función), p1 (expresión),
+t1 (puntos). El comando /lagrange o /newton puede citar el objeto
+(/newton t1) o usar el último declarado.
+
+Panel 2 — operaciones
+---------------------
+  /lagrange [objeto]   Polinomio interpolador de Lagrange
+  /newton   [objeto]   Interpolación por diferencias divididas
+
+Paleta de comandos
+------------------
+Escribe "/" para abrir la paleta. Filtra con fuzzy match, navega con
+↑/↓ o Tab/Shift+Tab, inserta con Enter y cierra con Esc.
+
+Atajos
+------
+  Tab              Cambiar de panel
+  Shift+Tab        Saltar al siguiente campo "?"
+  Enter            Guardar declaración o ejecutar operación
+  ↑/↓              Historial (panel 2) o navegar la paleta
+  PgUp/PgDn        Scroll del panel de salida
+  Ctrl+H           Abrir/cerrar esta ayuda
+  Ctrl+O           Selector de sesiones
+  Ctrl+Z / Ctrl+Y  Deshacer / rehacer
+  Ctrl+S           Guardar la sesión ahora
+  F2               Copiar la salida al portapapeles
+  Esc / Ctrl+C     Cerrar la ayuda/paleta o salir
+
+Sesiones
+--------
+El trabajo se guarda automáticamente cada 30 segundos en
+$XDG_DATA_HOME/tuniversalcalc/sessions (o ~/.local/share/...).
+Al salir también se guarda. Puedes abrir una sesión concreta con:
+
+  tuniversalcalc --session "mi sesión"
+  tuniversalcalc --new
+  tuniversalcalc --list
+
+Matemáticas
+-----------
+El parser acepta + - * / ^, paréntesis, multiplicación implícita
+(2x, x(y+1)), sqrt, sin, cos, abs, pi e inf. La salida muestra LaTeX
+emulado y una versión Unicode legible.
+
+Créditos
+--------
+Inspirado en la UX de nascTUI (parnoldx), Bubble Tea, Lipgloss y
+Bubbles de Charmbracelet. Ver README.md y CREDITS.md.

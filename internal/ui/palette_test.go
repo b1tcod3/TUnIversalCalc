@@ -35,11 +35,11 @@ func names(list []Template) []string {
 func TestBuildPalette(t *testing.T) {
 	// Fragmento vacío devuelve todo, en orden alfabético
 	decl := buildPalette(declRegistry, "")
-	if !reflect.DeepEqual(names(decl), []string{"ecuacion", "expresion", "funcion"}) {
+	if !reflect.DeepEqual(names(decl), []string{"ecuacion", "expresion", "funcion", "puntos"}) {
 		t.Fatalf("declaraciones no alfabéticas: %v", names(decl))
 	}
 	ops := buildPalette(opsRegistry, "")
-	if !reflect.DeepEqual(names(ops), []string{"derivar", "integral", "limite", "matriz", "resolver", "simplificar"}) {
+	if !reflect.DeepEqual(names(ops), []string{"lagrange", "newton"}) {
 		t.Fatalf("operaciones no alfabéticas: %v", names(ops))
 	}
 
@@ -52,9 +52,9 @@ func TestBuildPalette(t *testing.T) {
 		{declRegistry, "fnc", []string{"funcion"}},
 		{declRegistry, "expre", []string{"expresion"}},
 		{declRegistry, "ecu", []string{"ecuacion"}},
-		{opsRegistry, "rslv", []string{"resolver"}},
-		{opsRegistry, "integ", []string{"integral"}},
-		{opsRegistry, "smp", []string{"simplificar"}},
+		{declRegistry, "punt", []string{"puntos"}},
+		{opsRegistry, "lag", []string{"lagrange"}},
+		{opsRegistry, "newt", []string{"newton"}},
 		{opsRegistry, "zzz", []string{}},
 	}
 	for _, c := range cases {
@@ -109,7 +109,7 @@ func TestPaletteScroll(t *testing.T) {
 	m := NewModel()
 	m.palette.Open = true
 	m.palette.Max = 2
-	m.palette.List = buildPalette(opsRegistry, "")
+	m.palette.List = buildPalette(declRegistry, "")
 	m.palette.Sel, m.palette.Off = 0, 0
 
 	// La ventana avanza para que la selección sea siempre visible
@@ -151,7 +151,7 @@ func TestPaletteAbreEnPanel1(t *testing.T) {
 	if !m.palette.Open {
 		t.Fatal("debe abrirse con '/'")
 	}
-	if !reflect.DeepEqual(names(m.palette.List), []string{"ecuacion", "expresion", "funcion"}) {
+	if !reflect.DeepEqual(names(m.palette.List), []string{"ecuacion", "expresion", "funcion", "puntos"}) {
 		t.Fatalf("lista de declaraciones incorrecta: %v", names(m.palette.List))
 	}
 	if m.palette.Sel != 0 || m.palette.Anchor != FocusDecl {
@@ -193,12 +193,12 @@ func TestPaletteNavegacionClamp(t *testing.T) {
 	m.paletteDown()
 	m.paletteDown()
 	m.paletteDown()
-	if m.palette.Sel != 2 {
-		t.Fatalf("la selección debe quedarse en el último (2), quedó %d", m.palette.Sel)
+	if m.palette.Sel != 3 {
+		t.Fatalf("la selección debe quedarse en el último (3), quedó %d", m.palette.Sel)
 	}
 	m.paletteUp()
-	if m.palette.Sel != 1 {
-		t.Fatalf("Shift+Tab debe subir a 1, quedó %d", m.palette.Sel)
+	if m.palette.Sel != 2 {
+		t.Fatalf("Shift+Tab debe subir a 2, quedó %d", m.palette.Sel)
 	}
 	m.paletteUp()
 	m.paletteUp()
@@ -243,14 +243,14 @@ func TestPalettePanel2Operaciones(t *testing.T) {
 	m.declInput.Blur()
 	m.cmdInput.Focus()
 
-	// Panel 2: "/rslv" → resolver; Enter inserta plantilla de operación
-	m.cmdInput.SetValue("/rslv")
+	// Panel 2: "/lag" → lagrange; Enter inserta plantilla de operación
+	m.cmdInput.SetValue("/lag")
 	m.refreshPalette()
-	if !m.palette.Open || !reflect.DeepEqual(names(m.palette.List), []string{"resolver"}) {
+	if !m.palette.Open || !reflect.DeepEqual(names(m.palette.List), []string{"lagrange"}) {
 		t.Fatalf("paleta panel 2 incorrecta: open=%v %v", m.palette.Open, names(m.palette.List))
 	}
 	m.paletteSelect()
-	if m.cmdInput.Value() != "/resolver  ?" {
+	if m.cmdInput.Value() != "/lagrange " {
 		t.Fatalf("plantilla de operación no insertada: %q", m.cmdInput.Value())
 	}
 

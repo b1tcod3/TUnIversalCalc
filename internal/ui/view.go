@@ -11,6 +11,13 @@ import (
 )
 
 func (m *Model) View() string {
+	if m.helpOpen {
+		return m.helpView()
+	}
+	if m.picker.open {
+		return m.pickerView()
+	}
+
 	// Antes del primer WindowSizeMsg usamos dimensiones por defecto
 	if m.width == 0 || m.height == 0 {
 		m.width, m.height = 100, 28
@@ -40,7 +47,7 @@ func (m *Model) View() string {
 	case m.palette.Open && m.palette.Anchor == FocusCmd:
 		calcContent += "\n\n" + m.paletteView()
 	case !m.declValid:
-		calcContent = hintStyle.Render("⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /ecuacion 2x+2=0 (Enter)")
+		calcContent = hintStyle.Render("⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /puntos (1,2) (3,4) (Enter)")
 	}
 	calcStyle := calcPanelInactive
 	if m.focus == FocusCmd && m.declValid {
@@ -60,26 +67,13 @@ func (m *Model) View() string {
 	grid := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, panel3)
 
 	help := helpStyle.Render(clampWidth(
-		"[Tab] Panel • [Shift+Tab] Campo • [Enter] Guardar/Evaluar • [↑↓] Historial • [PgUp/PgDn] Scroll • [Esc] Salir",
+		"[Tab] Panel • [Enter] Ejecutar • [Ctrl+O] Sesiones • [Ctrl+Z/Y] Undo/Redo • [Ctrl+H] Ayuda • [Ctrl+S] Guardar • [Esc] Salir",
 		m.width,
 	))
 
 	// Sin newlines externos: el alto total debe ser exactamente m.height
 	// para que la terminal no haga scroll y corte la parte superior.
 	return grid + "\n" + help + "\n" + statusStyle.Render(clampWidth(m.statusBar(), m.width))
-}
-
-// clampWidth trunca una cadena plana (sin ANSI) para que quepa en maxW
-// columnas, añadiendo "…" cuando recorta.
-func clampWidth(s string, maxW int) string {
-	if maxW <= 1 {
-		return ""
-	}
-	r := []rune(s)
-	if w := len(r); w > maxW {
-		return string(r[:maxW-1]) + "…"
-	}
-	return s
 }
 
 // declEchoLine muestra en vivo cómo se interpreta la declaración del panel
@@ -141,10 +135,17 @@ func (m *Model) statusBar() string {
 	if m.declValid {
 		cmdState = "habilitado"
 	}
+	session := "—"
+	if m.sessionEnabled {
+		session = m.sessionName
+		if m.dirty {
+			session += "*"
+		}
+	}
 
 	return statusStyle.Render(fmt.Sprintf(
-		"Panel: %s | Objetos: %s | Comandos: %s | Historial: %d",
-		m.focus, objs, cmdState, len(m.history),
+		"Panel: %s | Objetos: %s | Comandos: %s | Historial: %d | Sesión: %s",
+		m.focus, objs, cmdState, len(m.history), session,
 	))
 }
 

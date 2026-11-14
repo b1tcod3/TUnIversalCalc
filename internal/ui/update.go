@@ -17,11 +17,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.updateLayout()
+		if m.helpOpen {
+			m.layoutHelp()
+		}
 		return m, nil
 
 	case ResultMsg:
 		m.applyResult(msg)
 		return m, nil
+
+	case autosaveMsg:
+		cmds := []tea.Cmd{m.autosaveTick()}
+		if m.dirty {
+			if cmd := m.saveSessionCmd(); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+		return m, tea.Batch(cmds...)
+
+	case sessionSavedMsg:
+		if msg.name != m.sessionName {
+			return m, nil
+		}
+		if msg.err != nil {
+			m.addLog(LevelError, "No se pudo guardar la sesión: "+msg.err.Error())
+		} else if sessionFingerprint(m.sessionData()) == msg.fingerprint {
+			m.dirty = false
+		}
+		return m, nil
+
+	case tea.MouseMsg:
+		if cmd, handled := m.handleMouse(msg); handled {
+			return m, cmd
+		}
 
 	case tea.KeyMsg:
 		if cmd, handled := m.handleKey(msg); handled {
@@ -31,17 +59,44 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Enrutar el mensaje solo al input enfocado (el otro devuelve nil)
 	var cmd tea.Cmd
+	if m.picker.open {
+		m.picker.query, cmd = m.picker.query.Update(msg)
+		return m, cmd
+	}
+	oldValue := m.focusedInputValue()
 	if m.focus == FocusDecl {
 		m.declInput, cmd = m.declInput.Update(msg)
 	} else {
 		m.cmdInput, cmd = m.cmdInput.Update(msg)
 	}
+	if m.focusedInputValue() != oldValue {
+		m.dirty = true
+	}
 	m.refreshPalette()
 	return m, cmd
 }
 
-// applyResult vuelca el resultado del motor en el log de salida.
+// focusedInputValue devuelve el texto del panel activo.
+func (m *Model) focusedInputValue() string {
+	if m.focus == FocusDecl {
+		return m.declInput.Value()
+	}
+	return m.cmdInput.Value()
+}
+
+// invalidatePending descarta resultados de operaciones lanzadas antes de un
+// cambio de estado (nueva declaración, undo, etc.).
+func (m *Model) invalidatePending() {
+	m.pendingReq = 0
+}
+
+// applyResult vuelca el resultado del motor en el log de salida. Los
+// resultados de peticiones antiguas se ignoran.
 func (m *Model) applyResult(res ResultMsg) {
+	if res.ReqID != 0 && res.ReqID != m.pendingReq {
+		return
+	}
+	m.pendingReq = 0
 	if res.Err != nil {
 		m.addLog(LevelError, res.Err.Error())
 		return
@@ -55,6 +110,16 @@ func (m *Model) applyResult(res ResultMsg) {
 // handleKey procesa una tecla. El segundo valor indica si el mensaje quedó
 // manejado; si no, cae al input enfocado.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	// El selector de sesiones es modal y tiene prioridad.
+	if m.picker.open {
+		return m.handleSessionPickerKey(msg)
+	}
+
+	// La ayuda modal tiene prioridad sobre paneles y paleta.
+	if m.helpOpen {
+		return m.handleHelpKey(msg)
+	}
+
 	// Paleta abierta: navegar, insertar o cerrar tiene prioridad
 	if m.palette.Open {
 		return m.handlePaletteKey(msg)
@@ -63,7 +128,30 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.Type {
 
 	case tea.KeyCtrlC, tea.KeyEsc:
-		return tea.Quit, true
+		return m.quit(), true
+
+	case tea.KeyCtrlH:
+		m.toggleHelp()
+		return nil, true
+
+	case tea.KeyCtrlO:
+		m.openSessionPicker()
+		return nil, true
+
+	case tea.KeyCtrlZ:
+		m.undo()
+		return nil, true
+
+	case tea.KeyCtrlY:
+		m.redo()
+		return nil, true
+
+	case tea.KeyCtrlS:
+		return m.manualSave(), true
+
+	case tea.KeyF2:
+		m.copyOutput()
+		return nil, true
 
 	// Navegación entre paneles
 	case tea.KeyTab:
@@ -105,6 +193,10 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 // refiltren la lista.
 func (m *Model) handlePaletteKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.Type {
+	case tea.KeyCtrlC:
+		return m.quit(), true
+	case tea.KeyCtrlS:
+		return m.manualSave(), true
 	case tea.KeyUp, tea.KeyShiftTab:
 		m.paletteUp()
 		return nil, true
@@ -133,9 +225,12 @@ func (m *Model) jumpNextTemplateField() {
 	if !HasFields(ti.Value()) {
 		return
 	}
+	m.pushUndo()
+	m.invalidatePending()
 	val, pos := JumpNextField(ti.Value(), ti.Position())
 	ti.SetValue(val)
 	ti.SetCursor(pos)
+	m.dirty = true
 }
 
 // handleEnter decide según el panel enfocado:
@@ -149,13 +244,16 @@ func (m *Model) handleEnter() tea.Cmd {
 	case FocusDecl:
 		raw := strings.TrimSpace(m.declInput.Value())
 		if raw == "" {
-			m.addLog(LevelInfo, "Declara un objeto: /ecuacion 2x+2=0, /funcion 2x+2 o /expresion x^2+1")
+			m.addLog(LevelInfo, "Declara un objeto: /puntos (1,2) (3,4), /funcion 2x+2 o /ecuacion 2x+2=0")
 			return nil
 		}
 		if tpl, ok := matchTemplate(declRegistry, raw); ok {
+			m.pushUndo()
+			m.invalidatePending()
 			val, pos := JumpNextField(tpl.InsertText, 0)
 			m.declInput.SetValue(val)
 			m.declInput.SetCursor(pos)
+			m.dirty = true
 			m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
 			return nil
 		}
@@ -164,6 +262,8 @@ func (m *Model) handleEnter() tea.Cmd {
 			m.addLog(LevelError, err.Error())
 			return nil
 		}
+		m.pushUndo()
+		m.invalidatePending()
 		d.Nombre = m.autoName(d.Tipo)
 		m.objs[d.Nombre] = d
 		m.lastObj = d.Nombre
@@ -179,9 +279,12 @@ func (m *Model) handleEnter() tea.Cmd {
 			return nil
 		}
 		if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
+			m.pushUndo()
+			m.invalidatePending()
 			val, pos := JumpNextField(tpl.InsertText, 0)
 			m.cmdInput.SetValue(val)
 			m.cmdInput.SetCursor(pos)
+			m.dirty = true
 			m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
 			return nil
 		}
@@ -194,18 +297,20 @@ func (m *Model) handleEnter() tea.Cmd {
 		if !ok {
 			return nil
 		}
+		m.pushUndo()
 		m.pushHistory(val)
 		m.addLog(LevelInfo, fmt.Sprintf("Comando: %s  (objeto: %s = %s)", val, decl.Nombre, decl.Latex))
-		return evaluateCmd(decl, val, varName)
+		m.reqSeq++
+		m.pendingReq = m.reqSeq
+		return evaluateCmd(decl, val, varName, m.pendingReq)
 	}
 	return nil
 }
 
 // resolveTarget averigua sobre qué objeto y variable opera el comando:
-//   - /resolver x     → último objeto, variable x
-//   - /resolver e1 x  → objeto e1, variable x
-//   - /resolver e1    → objeto e1 (variable por defecto x)
-//   - /resolver g1    → error si "g1" no es un objeto declarado
+//   - /lagrange x     → último objeto, variable x
+//   - /lagrange t1    → objeto t1
+//   - /newton g1      → error si "g1" no es un objeto declarado
 func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
 	norm := strings.NewReplacer("(", "", ")", "", ",", "").Replace(cmd)
 	toks := strings.Fields(norm)
@@ -231,7 +336,7 @@ func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
 		objName = m.lastObj
 	}
 	if objName == "" {
-		m.addLog(LevelError, "no hay objetos declarados: declara uno en el panel 1 (/ecuacion 2x+2=0)")
+		m.addLog(LevelError, "no hay objetos declarados: declara uno en el panel 1 (/puntos (1,2) (3,4))")
 		return engine.Decl{}, "", false
 	}
 	return m.objs[objName], varName, true
@@ -306,6 +411,7 @@ func (m *Model) addLog(level LogLevel, content string) {
 	}
 	m.output.SetContent(m.renderLog())
 	m.output.GotoBottom()
+	m.dirty = true
 }
 
 func (m *Model) renderLog() string {

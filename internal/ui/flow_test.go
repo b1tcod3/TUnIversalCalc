@@ -124,6 +124,21 @@ func declararEcuacionYFuncion(t *testing.T, m *Model) {
 	}
 }
 
+// declararPuntos registra t1 = (1,2) (3,4) (5,6) via el panel 1.
+func declararPuntos(t *testing.T, m *Model) {
+	t.Helper()
+	m.switchPanel() // volver al panel 1
+	m.declInput.SetValue("/puntos (1,2) (3,4) (5,6)")
+	m.handleEnter()
+	d, ok := m.objs["t1"]
+	if !ok || d.Tipo != engine.DeclPuntos {
+		t.Fatalf("t1 no registrada correctamente: %+v", m.objs)
+	}
+	if len(d.Points) != 3 || d.Points[0].X != 1 || d.Points[2].Y != 6 {
+		t.Fatalf("puntos mal guardados: %+v", d.Points)
+	}
+}
+
 func TestEstadoInicialPanel2Bloqueado(t *testing.T) {
 	m := newFlowModel()
 
@@ -181,12 +196,13 @@ func TestDeclararFuncionAutoNombre(t *testing.T) {
 	}
 }
 
-func TestResolverUltimoObjeto(t *testing.T) {
+func TestLagrangeUltimoObjeto(t *testing.T) {
 	m := newFlowModel()
-	declararEcuacionYFuncion(t, &m)
+	declararEcuacion(t, &m)
+	declararPuntos(t, &m) // t1 pasa a ser el último objeto
 
-	// /resolver x -> opera sobre el último objeto (f1)
-	m.cmdInput.SetValue("/resolver x")
+	// /lagrange x -> el token de un carácter es variable: opera sobre el último (t1)
+	m.cmdInput.SetValue("/lagrange x")
 	cmd := m.handleEnter()
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
@@ -197,24 +213,28 @@ func TestResolverUltimoObjeto(t *testing.T) {
 		t.Fatalf("ResultMsg inesperado: %+v", msg)
 	}
 	all := strings.Join(res.Steps, " ")
-	if !strings.Contains(all, "f1") || !strings.Contains(all, "2x + 2") {
-		t.Fatalf("pasos sin objeto f1 ni LaTeX: %q", all)
+	if !strings.Contains(all, "t1") || !strings.Contains(all, "P(x) = x + 1") {
+		t.Fatalf("pasos sin objeto t1 ni polinomio: %q", all)
 	}
 }
 
-func TestResolverObjetoExplicito(t *testing.T) {
+func TestNewtonObjetoExplicito(t *testing.T) {
 	m := newFlowModel()
-	declararEcuacionYFuncion(t, &m)
+	declararEcuacion(t, &m)
+	declararPuntos(t, &m)
 
-	// /resolver e1 x -> objeto explícito con variable
-	m.cmdInput.SetValue("/resolver e1 x")
+	// /newton t1 -> objeto explícito
+	m.cmdInput.SetValue("/newton t1")
 	cmd := m.handleEnter()
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
 	}
 	res := cmd().(ResultMsg)
-	if !strings.Contains(strings.Join(res.Steps, " "), "e1") {
-		t.Fatalf("pasos sin objeto e1: %q", res.Steps)
+	if res.Err != nil {
+		t.Fatalf("newton falló: %v", res.Err)
+	}
+	if !strings.Contains(strings.Join(res.Steps, " "), "t1") {
+		t.Fatalf("pasos sin objeto t1: %q", res.Steps)
 	}
 }
 
@@ -223,7 +243,7 @@ func TestResolverErrores(t *testing.T) {
 	declararEcuacionYFuncion(t, &m)
 
 	// Error inteligente: objeto inexistente
-	m.cmdInput.SetValue("/resolver g1")
+	m.cmdInput.SetValue("/lagrange g1")
 	if cmd := m.handleEnter(); cmd != nil {
 		t.Fatal("no debe lanzarse comando con objeto inexistente")
 	}

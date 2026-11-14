@@ -35,8 +35,8 @@ const (
 
 // LogEntry es una línea tipada del panel de salida.
 type LogEntry struct {
-	Level   LogLevel
-	Content string
+	Level   LogLevel `json:"level"`
+	Content string   `json:"content"`
 }
 
 const maxLogEntries = 200
@@ -65,40 +65,68 @@ type Model struct {
 
 	// Selector de comandos al escribir "/" (paleta de auto-completado).
 	palette Palette
+
+	// Petición asíncrona más reciente: los resultados con un ReqID viejo
+	// se descartan para no pisar una operación nueva.
+	reqSeq     int
+	pendingReq int
+
+	// Undo/redo de la sesión (snapshots acotados).
+	undoStack []uiSnapshot
+	redoStack []uiSnapshot
+
+	// Persistencia: sesión activa y si hay cambios sin guardar.
+	sessionName    string
+	sessionEnabled bool
+	dirty          bool
+
+	// Ayuda contextual (Ctrl+H).
+	helpOpen     bool
+	helpViewport viewport.Model
+
+	// Selector de sesiones (Ctrl+O).
+	picker sessionPicker
 }
 
 func NewModel() Model {
 	declTi := textinput.New()
-	declTi.Placeholder = "ej. /ecuacion 2x+2=0, /funcion 2x+2"
+	declTi.Placeholder = "ej. /puntos (1,2) (3,4), /funcion 2x+2"
 	declTi.Prompt = "❯ "
 	declTi.CharLimit = 200
 	declTi.Focus()
 
 	cmdTi := textinput.New()
-	cmdTi.Placeholder = "ej. /resolver x, /integral, /derivar"
+	cmdTi.Placeholder = "ej. /lagrange t1, /newton"
 	cmdTi.Prompt = "❯ "
 	cmdTi.CharLimit = 200
 
 	output := viewport.New(60, 10)
+	helpVp := viewport.New(0, 0)
 
 	m := Model{
-		declInput: declTi,
-		cmdInput:  cmdTi,
-		output:    output,
-		focus:     FocusDecl,
-		histIdx:   -1,
-		objs:      map[string]engine.Decl{},
-		counters:  map[engine.DeclType]int{},
+		declInput:    declTi,
+		cmdInput:     cmdTi,
+		output:       output,
+		helpViewport: helpVp,
+		focus:        FocusDecl,
+		histIdx:      -1,
+		picker:       newSessionPicker(),
+		objs:         map[string]engine.Decl{},
+		counters:     map[engine.DeclType]int{},
 		outputLog: []LogEntry{
 			{Level: LevelInfo, Content: "Bienvenido a TUnIversalCalc"},
-			{Level: LevelInfo, Content: "1. Declara un objeto: /ecuacion 2x+2=0, /funcion 2x+2 o /expresion x^2+1"},
-			{Level: LevelInfo, Content: "2. Opera por nombre o sobre el último objeto: /resolver x, /integral, /derivar"},
+			{Level: LevelInfo, Content: "1. Declara un objeto: /puntos (1,2) (3,4), /funcion 2x+2 o /ecuacion 2x+2=0"},
+			{Level: LevelInfo, Content: "2. Interpola por nombre o sobre el último objeto: /lagrange t1, /newton"},
+			{Level: LevelInfo, Content: "Atajos: Ctrl+H ayuda · Ctrl+Z/Ctrl+Y deshacer/rehacer · Ctrl+S guardar"},
 		},
 	}
 	m.output.SetContent(m.renderLog())
 	return m
 }
 
-func (*Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
+	if m.sessionEnabled {
+		return tea.Batch(textinput.Blink, m.autosaveTick())
+	}
 	return textinput.Blink
 }

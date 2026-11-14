@@ -1,5 +1,7 @@
 # Binario compilado
 /tuniversalcalc
+/bin/
+coverage.out
 
 # Archivos de entorno
 .env

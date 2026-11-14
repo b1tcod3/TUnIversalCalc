@@ -23,6 +23,13 @@ func TestParseDecl(t *testing.T) {
 		{"/expresion x^2+1", false},
 		{"/expresion x=1", true},
 		{"/expresion ", true},
+		{"/puntos (1,2) (3,4)", false},
+		{"/puntos (1,2)", true},
+		{"/puntos 1,2 3,4 5,6", false},
+		{"/puntos (1,2)(3,4)", false},
+		{"/puntos", true},
+		{"/puntos (a,b)", true},
+		{"/puntos (1,2) (1,5)", true},
 		{"/resolver x", true},
 		{"/zz 2x", true},
 	}
@@ -63,6 +70,31 @@ func TestParseDeclContent(t *testing.T) {
 	}
 	if p.Tipo != DeclExpresion || p.Pretty != "x²ʸ+√(x)" {
 		t.Fatalf("expresión mal transformada: %+v", p)
+	}
+}
+
+func TestParseDeclPuntos(t *testing.T) {
+	d, err := ParseDecl("/puntos (1,2) (3,4) (5,6)")
+	if err != nil {
+		t.Fatalf("puntos válidos rechazados: %v", err)
+	}
+	if d.Tipo != DeclPuntos || len(d.Points) != 3 {
+		t.Fatalf("puntos mal clasificados: %+v", d)
+	}
+	want := []Point{{1, 2}, {3, 4}, {5, 6}}
+	for i, p := range d.Points {
+		if p != want[i] {
+			t.Fatalf("punto %d = %+v, se esperaba %+v", i, p, want[i])
+		}
+	}
+
+	// Formato sin paréntesis también se acepta
+	d2, err := ParseDecl("/puntos 0,1 1,3")
+	if err != nil {
+		t.Fatalf("puntos sin paréntesis rechazados: %v", err)
+	}
+	if d2.Tipo != DeclPuntos || len(d2.Points) != 2 || d2.Points[1].X != 1 {
+		t.Fatalf("puntos sin paréntesis mal parseados: %+v", d2.Points)
 	}
 }
 

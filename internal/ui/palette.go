@@ -139,6 +139,8 @@ func (m *Model) paletteDown() {
 func (m *Model) paletteSelect() {
 	tpl := m.palette.List[m.palette.Sel]
 	m.closePalette()
+	m.pushUndo()
+	m.invalidatePending()
 	val, pos := JumpNextField(tpl.InsertText, 0)
 	if m.focus == FocusDecl {
 		m.declInput.SetValue(val)
@@ -147,6 +149,7 @@ func (m *Model) paletteSelect() {
 		m.cmdInput.SetValue(val)
 		m.cmdInput.SetCursor(pos)
 	}
+	m.dirty = true
 	m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
 }
 

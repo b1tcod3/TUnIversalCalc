@@ -47,10 +47,10 @@ var titleRightStyle = lipgloss.NewStyle().
 
 func titleRight(title, short, color string, innerW int) string {
 	t := title
-	if innerW < len(title)+2 {
+	if innerW < visualWidth(title)+2 {
 		t = short
 	}
-	if innerW < len(short)+2 {
+	if innerW < visualWidth(short)+2 {
 		return ""
 	}
 	return lipgloss.PlaceHorizontal(
@@ -90,3 +90,13 @@ var brandStyle = lipgloss.NewStyle().
 var hintStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("244")).
 	Italic(true)
+
+// Estilos de la pantalla de ayuda
+var (
+	helpBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(colorOutput)).
+			Padding(0, 1)
+	helpTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorOutput))
+	helpFooterStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorInfo))
+)
