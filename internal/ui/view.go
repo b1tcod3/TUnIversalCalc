@@ -34,9 +34,12 @@ func (m *Model) View() string {
 	}
 	exprStyle = exprStyle.Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
 	exprBody := m.declInput.View()
-	if m.palette.Open && m.palette.Anchor == FocusDecl {
+	switch {
+	case m.palette.Open && m.palette.Anchor == FocusDecl:
 		exprBody += "\n\n" + m.paletteView()
-	} else {
+	case m.completion.Open && m.completion.Anchor == FocusDecl:
+		exprBody += "\n\n" + m.completionView()
+	default:
 		exprBody += m.declEchoLine()
 	}
 	panel1 := exprStyle.Render(titleRight(" 1. Declaración ", " Declaración ", colorExprActive, innerL) + "\n\n" + exprBody)
@@ -46,8 +49,16 @@ func (m *Model) View() string {
 	switch {
 	case m.palette.Open && m.palette.Anchor == FocusCmd:
 		calcContent += "\n\n" + m.paletteView()
+	case m.completion.Open && m.completion.Anchor == FocusCmd:
+		calcContent += "\n\n" + m.completionView()
 	case !m.declValid:
 		calcContent = hintStyle.Render("⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /puntos (1,2) (3,4) (Enter)")
+	}
+	if !(m.palette.Open && m.palette.Anchor == FocusCmd) &&
+		!(m.completion.Open && m.completion.Anchor == FocusCmd) {
+		if pv := m.previewView(); pv != "" {
+			calcContent += "\n\n" + pv
+		}
 	}
 	calcStyle := calcPanelInactive
 	if m.focus == FocusCmd && m.declValid {

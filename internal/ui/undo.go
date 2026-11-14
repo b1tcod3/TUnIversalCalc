@@ -90,6 +90,8 @@ func (m *Model) restore(s uiSnapshot) {
 
 	m.helpOpen = false
 	m.closePalette()
+	m.closeCompletion()
+	m.clearPreview()
 	m.invalidatePending()
 	m.output.SetContent(m.renderLog())
 	m.output.GotoBottom()

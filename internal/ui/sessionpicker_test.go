@@ -76,3 +76,77 @@ func TestSessionPickerViewCabe(t *testing.T) {
 	small.picker.items = []SessionMeta{{Name: "alfa"}}
 	checkView(t, &small, [2]int{40, 12}, "selector-sesiones-pequeño")
 }
+
+func TestSessionPickerRenombrar(t *testing.T) {
+	seedSessions(t)
+	m := newFlowModel()
+	m.sessionName = "alfa"
+	m.sessionEnabled = true
+	m.openSessionPicker()
+	m.picker.query.SetValue("alfa")
+	m.picker.clamp()
+
+	if cmd := m.startRename(); cmd == nil {
+		t.Fatal("startRename debe devolver el blink del input")
+	}
+	m.picker.nameInput.SetValue("gamma")
+	m.acceptRename()
+
+	if m.sessionName != "gamma" {
+		t.Fatalf("sesión activa = %q", m.sessionName)
+	}
+	if !SessionExists("gamma") || SessionExists("alfa") {
+		t.Fatal("el archivo no se renombró")
+	}
+	if last, ok := LastSessionName(); !ok || last != "gamma" {
+		t.Fatalf("última sesión = %q, %v", last, ok)
+	}
+}
+
+func TestSessionPickerDuplicar(t *testing.T) {
+	seedSessions(t)
+	m := newFlowModel()
+	m.sessionName = "alfa"
+	m.sessionEnabled = true
+	m.openSessionPicker()
+	m.picker.query.SetValue("alfa")
+	m.picker.clamp()
+	m.duplicateSelected()
+
+	if !SessionExists("alfa copia") {
+		t.Fatal("la sesión duplicada no existe")
+	}
+	if !strings.Contains(m.picker.status, "duplicada") {
+		t.Fatalf("estado = %q", m.picker.status)
+	}
+}
+
+func TestSessionPickerBorrar(t *testing.T) {
+	seedSessions(t)
+	m := newFlowModel()
+	m.sessionName = "beta"
+	m.sessionEnabled = true
+	m.openSessionPicker()
+	m.picker.query.SetValue("alfa")
+	m.picker.clamp()
+	m.deleteSelectedSession()
+
+	if SessionExists("alfa") {
+		t.Fatal("alfa no se borró")
+	}
+	if m.SessionName() != "beta" {
+		t.Fatalf("no debe cambiar la sesión activa: %q", m.SessionName())
+	}
+
+	// Borrar la sesión activa cae en la siguiente o crea una nueva.
+	m.picker.query.SetValue("beta")
+	m.picker.clamp()
+	m.picker.mode = pickerBrowse
+	m.deleteSelectedSession()
+	if SessionExists("beta") {
+		t.Fatal("beta no se borró")
+	}
+	if m.SessionName() == "" || m.SessionName() == "beta" {
+		t.Fatalf("sesión de respaldo inesperada: %q", m.SessionName())
+	}
+}

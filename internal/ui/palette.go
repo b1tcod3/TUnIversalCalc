@@ -87,6 +87,9 @@ func (m *Model) refreshPalette() {
 		m.palette.Sel, m.palette.Off = 0, 0
 	}
 	m.clampPalette()
+	if m.palette.Open {
+		m.closeCompletion()
+	}
 }
 
 // closePalette cierra la paleta conservando Max (lo fija updateLayout).
@@ -141,6 +144,7 @@ func (m *Model) paletteSelect() {
 	m.closePalette()
 	m.pushUndo()
 	m.invalidatePending()
+	m.clearPreview()
 	val, pos := JumpNextField(tpl.InsertText, 0)
 	if m.focus == FocusDecl {
 		m.declInput.SetValue(val)
@@ -181,9 +185,9 @@ func (m *Model) paletteView() string {
 
 // Estilos de la paleta
 var (
-	paletteRowStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorInfo))
+	paletteRowStyle = lipgloss.NewStyle().Foreground(colorInfo)
 	paletteSelStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("236")).
-			Foreground(lipgloss.Color("255")).
+			Background(lipgloss.AdaptiveColor{Light: "#D0D0D0", Dark: "#303030"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "#000000", Dark: "#FFFFFF"}).
 			Bold(true)
 )

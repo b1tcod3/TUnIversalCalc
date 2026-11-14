@@ -66,6 +66,9 @@ type Model struct {
 	// Selector de comandos al escribir "/" (paleta de auto-completado).
 	palette Palette
 
+	// Autocompletado de funciones/constantes/objetos (Ctrl+Space).
+	completion completion
+
 	// Petición asíncrona más reciente: los resultados con un ReqID viejo
 	// se descartan para no pisar una operación nueva.
 	reqSeq     int
@@ -86,6 +89,9 @@ type Model struct {
 
 	// Selector de sesiones (Ctrl+O).
 	picker sessionPicker
+
+	// Previsualización en vivo del comando (debounce).
+	preview previewState
 }
 
 func NewModel() Model {

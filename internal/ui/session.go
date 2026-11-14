@@ -200,6 +200,59 @@ func DeleteSession(name string) error {
 	return nil
 }
 
+// RenameSession renombra una sesión existente y actualiza el puntero de
+// última sesión si era la activa.
+func RenameSession(oldName, newName string) error {
+	oldName = sanitizeSessionName(oldName)
+	newName = sanitizeSessionName(newName)
+	if oldName == "" || newName == "" {
+		return fmt.Errorf("nombre de sesión vacío o inválido")
+	}
+	if oldName == newName {
+		return nil
+	}
+	if !SessionExists(oldName) {
+		return fmt.Errorf("la sesión %q no existe", oldName)
+	}
+	if SessionExists(newName) {
+		return fmt.Errorf("la sesión %q ya existe", newName)
+	}
+	if err := os.Rename(sessionPath(oldName), sessionPath(newName)); err != nil {
+		return err
+	}
+	if data, err := os.ReadFile(lastSessionPath()); err == nil {
+		if sanitizeSessionName(strings.TrimSpace(string(data))) == oldName {
+			_ = atomicWrite(lastSessionPath(), []byte(newName+"\n"))
+		}
+	}
+	return nil
+}
+
+// DuplicateSession copia una sesión con un nombre único y devuelve el nuevo.
+func DuplicateSession(name string) (string, error) {
+	payload, err := os.ReadFile(sessionPath(name))
+	if err != nil {
+		return "", err
+	}
+	copyName := uniqueSessionName(name + " copia")
+	if err := atomicWrite(sessionPath(copyName), payload); err != nil {
+		return "", err
+	}
+	return copyName, nil
+}
+
+func uniqueSessionName(base string) string {
+	if !SessionExists(base) {
+		return base
+	}
+	for i := 2; ; i++ {
+		candidate := fmt.Sprintf("%s %d", base, i)
+		if !SessionExists(candidate) {
+			return candidate
+		}
+	}
+}
+
 func atomicWrite(path string, payload []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -366,6 +419,8 @@ func (m *Model) applySession(name string, data SessionData) {
 	m.pendingReq = 0
 	m.helpOpen = false
 	m.closePalette()
+	m.closeCompletion()
+	m.clearPreview()
 	m.output.SetContent(m.renderLog())
 	m.output.GotoBottom()
 	m.dirty = false

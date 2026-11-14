@@ -54,6 +54,8 @@ func (m *Model) focusPanel(f Focus) {
 		return
 	}
 	m.closePalette()
+	m.closeCompletion()
+	m.clearPreview()
 	m.focus = f
 	m.declInput.Blur()
 	m.cmdInput.Blur()

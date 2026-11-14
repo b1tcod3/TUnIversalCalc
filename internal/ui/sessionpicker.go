@@ -9,12 +9,23 @@ import (
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
+type pickerMode int
+
+const (
+	pickerBrowse pickerMode = iota
+	pickerRename
+	pickerConfirmDelete
+)
+
 // sessionPicker es el selector modal de sesiones (Ctrl+O).
 type sessionPicker struct {
-	open  bool
-	query textinput.Model
-	items []SessionMeta
-	sel   int
+	open      bool
+	mode      pickerMode
+	query     textinput.Model
+	nameInput textinput.Model
+	items     []SessionMeta
+	sel       int
+	status    string
 }
 
 func newSessionPicker() sessionPicker {
@@ -22,7 +33,12 @@ func newSessionPicker() sessionPicker {
 	q.Prompt = "> "
 	q.Placeholder = "filtra por nombre…"
 	q.CharLimit = maxSessionNameLen
-	return sessionPicker{query: q}
+
+	name := textinput.New()
+	name.Prompt = ""
+	name.CharLimit = maxSessionNameLen
+
+	return sessionPicker{query: q, nameInput: name}
 }
 
 // filtered devuelve las sesiones que coinciden con la consulta, conservando
@@ -59,6 +75,11 @@ func (p *sessionPicker) clamp() {
 	}
 }
 
+func (p *sessionPicker) reload() {
+	p.items = ListSessions()
+	p.clamp()
+}
+
 func (m *Model) openSessionPicker() {
 	if !m.sessionEnabled {
 		m.addLog(LevelInfo, "Sesión no habilitada: inicia sin --no-save para usar sesiones")
@@ -72,19 +93,37 @@ func (m *Model) openSessionPicker() {
 	}
 	m.closePalette()
 	m.helpOpen = false
+	m.closeCompletion()
+	m.clearPreview()
 	m.picker.open = true
+	m.picker.mode = pickerBrowse
 	m.picker.items = items
 	m.picker.sel = 0
+	m.picker.status = ""
 	m.picker.query.SetValue("")
 	m.picker.query.Focus()
+	m.picker.nameInput.Blur()
 }
 
 func (m *Model) closeSessionPicker() {
 	m.picker.open = false
+	m.picker.mode = pickerBrowse
+	m.picker.status = ""
 	m.picker.query.Blur()
+	m.picker.nameInput.Blur()
 }
 
 func (m *Model) handleSessionPickerKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch m.picker.mode {
+	case pickerRename:
+		return m.handlePickerRenameKey(msg)
+	case pickerConfirmDelete:
+		return m.handlePickerDeleteKey(msg)
+	}
+	return m.handlePickerBrowseKey(msg)
+}
+
+func (m *Model) handlePickerBrowseKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.Type {
 	case tea.KeyCtrlC:
 		return m.quit(), true
@@ -108,12 +147,143 @@ func (m *Model) handleSessionPickerKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		}
 		m.switchToSession(s.Name)
 		return nil, true
+	case tea.KeyCtrlR:
+		return m.startRename(), true
+	case tea.KeyCtrlU:
+		m.duplicateSelected()
+		return nil, true
+	case tea.KeyCtrlD:
+		if _, ok := m.picker.selected(); ok {
+			m.picker.mode = pickerConfirmDelete
+			m.picker.status = ""
+			m.picker.query.Blur()
+		}
+		return nil, true
 	}
 
 	var cmd tea.Cmd
 	m.picker.query, cmd = m.picker.query.Update(msg)
+	m.picker.status = ""
 	m.picker.clamp()
 	return cmd, true
+}
+
+func (m *Model) startRename() tea.Cmd {
+	s, ok := m.picker.selected()
+	if !ok {
+		return nil
+	}
+	m.picker.mode = pickerRename
+	m.picker.status = ""
+	m.picker.query.Blur()
+	m.picker.nameInput.SetValue(s.Name)
+	m.picker.nameInput.CursorEnd()
+	m.picker.nameInput.Focus()
+	return textinput.Blink
+}
+
+func (m *Model) handlePickerRenameKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.Type {
+	case tea.KeyCtrlC:
+		return m.quit(), true
+	case tea.KeyEsc:
+		m.picker.mode = pickerBrowse
+		m.picker.nameInput.Blur()
+		m.picker.query.Focus()
+		return nil, true
+	case tea.KeyEnter:
+		m.acceptRename()
+		return nil, true
+	}
+
+	var cmd tea.Cmd
+	m.picker.nameInput, cmd = m.picker.nameInput.Update(msg)
+	return cmd, true
+}
+
+func (m *Model) acceptRename() {
+	s, ok := m.picker.selected()
+	if !ok {
+		return
+	}
+	newName := sanitizeSessionName(m.picker.nameInput.Value())
+	if newName == "" {
+		m.picker.status = "el nombre no puede estar vacío"
+		return
+	}
+	if newName != s.Name {
+		if err := RenameSession(s.Name, newName); err != nil {
+			m.picker.status = "no se pudo renombrar: " + err.Error()
+			return
+		}
+		if m.sessionName == s.Name {
+			m.sessionName = newName
+		}
+		m.picker.status = "renombrada como " + newName
+	}
+	m.picker.mode = pickerBrowse
+	m.picker.nameInput.Blur()
+	m.picker.query.Focus()
+	m.picker.reload()
+}
+
+func (m *Model) duplicateSelected() {
+	s, ok := m.picker.selected()
+	if !ok {
+		return
+	}
+	copyName, err := DuplicateSession(s.Name)
+	if err != nil {
+		m.picker.status = "no se pudo duplicar: " + err.Error()
+		return
+	}
+	m.picker.status = "duplicada como " + copyName
+	m.picker.reload()
+}
+
+func (m *Model) handlePickerDeleteKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if msg.Type == tea.KeyCtrlC {
+		return m.quit(), true
+	}
+	switch strings.ToLower(msg.String()) {
+	case "y":
+		m.deleteSelectedSession()
+	default:
+		m.picker.mode = pickerBrowse
+		m.picker.query.Focus()
+	}
+	return nil, true
+}
+
+func (m *Model) deleteSelectedSession() {
+	s, ok := m.picker.selected()
+	if !ok {
+		m.picker.mode = pickerBrowse
+		return
+	}
+	if err := DeleteSession(s.Name); err != nil {
+		m.picker.status = "no se pudo borrar: " + err.Error()
+		m.picker.mode = pickerBrowse
+		return
+	}
+	m.picker.status = "borrada " + s.Name
+	m.picker.mode = pickerBrowse
+	m.picker.reload()
+
+	if m.sessionName != s.Name {
+		m.picker.query.Focus()
+		return
+	}
+
+	// La sesión abierta desapareció: saltar a la siguiente más reciente o
+	// crear una nueva vacía.
+	m.sessionName = ""
+	m.picker.open = false
+	if next, exists := LastSessionName(); exists {
+		m.switchToSession(next)
+		return
+	}
+	m.applySession(NewSessionName(), SessionData{})
 }
 
 // switchToSession guarda la sesión actual y carga la seleccionada.
@@ -147,13 +317,26 @@ func (m *Model) pickerView() string {
 	if width < 24 {
 		width = 24
 	}
-	title := helpTitleStyle.Render("Sesiones (Ctrl+O)")
-	query := m.picker.query.View()
+	m.picker.nameInput.Width = width - 18
+	if m.picker.nameInput.Width < 10 {
+		m.picker.nameInput.Width = 10
+	}
+
+	title := helpTitleStyle.Render("Sesiones")
+	header := m.picker.query.View()
+	switch m.picker.mode {
+	case pickerRename:
+		header = "Renombrar a: " + m.picker.nameInput.View()
+	case pickerConfirmDelete:
+		s, _ := m.picker.selected()
+		header = lipgloss.NewStyle().Foreground(colorError).Render(
+			"¿Eliminar \"" + truncateVisual(s.Name, width-24) + "\"? (y/N)")
+	}
 
 	list := m.picker.filtered()
-	maxRows := m.height - 8
-	if maxRows < 3 {
-		maxRows = 3
+	maxRows := m.height - 10
+	if maxRows < 2 {
+		maxRows = 2
 	}
 	start := m.picker.sel - maxRows/2
 	if start < 0 {
@@ -170,7 +353,7 @@ func (m *Model) pickerView() string {
 
 	var rows []string
 	if len(list) == 0 {
-		rows = append(rows, lipgloss.NewStyle().Foreground(lipgloss.Color(colorInfo)).Render("  (sin coincidencias)"))
+		rows = append(rows, lipgloss.NewStyle().Foreground(colorInfo).Render("  (sin coincidencias)"))
 	}
 	for i := start; i < end; i++ {
 		s := list[i]
@@ -182,8 +365,19 @@ func (m *Model) pickerView() string {
 		}
 	}
 
-	content := title + "\n" + query + "\n\n" + strings.Join(rows, "\n") +
-		"\n\n" + helpFooterStyle.Render("↑/↓ seleccionar · Enter abrir · Esc cerrar")
+	footer := "↑/↓ seleccionar · Enter abrir · ^R renombrar · ^U duplicar · ^D borrar · Esc cerrar"
+	switch m.picker.mode {
+	case pickerRename:
+		footer = "Enter guardar · Esc cancelar"
+	case pickerConfirmDelete:
+		footer = "y confirmar · cualquier otra tecla cancelar"
+	}
+	if m.picker.status != "" {
+		footer = m.picker.status
+	}
+
+	content := title + "\n" + header + "\n\n" + strings.Join(rows, "\n") +
+		"\n\n" + helpFooterStyle.Render(truncateVisual(footer, width))
 	box := helpBoxStyle.Width(width).Render(content)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }

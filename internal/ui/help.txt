@@ -38,6 +38,7 @@ Atajos
   PgUp/PgDn        Scroll del panel de salida
   Ctrl+H           Abrir/cerrar esta ayuda
   Ctrl+O           Selector de sesiones
+  Ctrl+Space       Autocompletar funciones, constantes u objetos
   Ctrl+Z / Ctrl+Y  Deshacer / rehacer
   Ctrl+S           Guardar la sesión ahora
   F2               Copiar la salida al portapapeles
@@ -52,6 +53,9 @@ Al salir también se guarda. Puedes abrir una sesión concreta con:
   tuniversalcalc --session "mi sesión"
   tuniversalcalc --new
   tuniversalcalc --list
+
+En el selector (Ctrl+O): ↑/↓ navega, Enter abre, Ctrl+R renombra,
+Ctrl+U duplica, Ctrl+D borra (y confirma), Esc cierra.
 
 Matemáticas
 -----------

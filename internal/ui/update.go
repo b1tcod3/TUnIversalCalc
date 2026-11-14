@@ -26,6 +26,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyResult(msg)
 		return m, nil
 
+	case previewTickMsg:
+		return m, m.handlePreviewTick(msg)
+
+	case previewResultMsg:
+		m.applyPreviewResult(msg)
+		return m, nil
+
 	case autosaveMsg:
 		cmds := []tea.Cmd{m.autosaveTick()}
 		if m.dirty {
@@ -71,6 +78,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if m.focusedInputValue() != oldValue {
 		m.dirty = true
+		if m.focus == FocusCmd {
+			if previewCmd := m.schedulePreview(); previewCmd != nil {
+				cmd = tea.Batch(cmd, previewCmd)
+			}
+		}
 	}
 	m.refreshPalette()
 	return m, cmd
@@ -125,10 +137,19 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		return m.handlePaletteKey(msg)
 	}
 
+	// Popup de autocompletado de expresiones.
+	if m.completion.Open {
+		return m.handleCompletionKey(msg)
+	}
+
 	switch msg.Type {
 
 	case tea.KeyCtrlC, tea.KeyEsc:
 		return m.quit(), true
+
+	case tea.KeyCtrlAt:
+		m.openCompletions()
+		return nil, true
 
 	case tea.KeyCtrlH:
 		m.toggleHelp()
@@ -264,6 +285,7 @@ func (m *Model) handleEnter() tea.Cmd {
 		}
 		m.pushUndo()
 		m.invalidatePending()
+		m.clearPreview()
 		d.Nombre = m.autoName(d.Tipo)
 		m.objs[d.Nombre] = d
 		m.lastObj = d.Nombre
@@ -300,6 +322,7 @@ func (m *Model) handleEnter() tea.Cmd {
 		m.pushUndo()
 		m.pushHistory(val)
 		m.addLog(LevelInfo, fmt.Sprintf("Comando: %s  (objeto: %s = %s)", val, decl.Nombre, decl.Latex))
+		m.clearPreview()
 		m.reqSeq++
 		m.pendingReq = m.reqSeq
 		return evaluateCmd(decl, val, varName, m.pendingReq)
@@ -312,8 +335,7 @@ func (m *Model) handleEnter() tea.Cmd {
 //   - /lagrange t1    → objeto t1
 //   - /newton g1      → error si "g1" no es un objeto declarado
 func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
-	norm := strings.NewReplacer("(", "", ")", "", ",", "").Replace(cmd)
-	toks := strings.Fields(norm)
+	toks := splitCommandTokens(normalizeCommandArgs(cmd))
 	if len(toks) == 0 {
 		return engine.Decl{}, "", false
 	}
@@ -350,6 +372,8 @@ func (m *Model) autoName(t engine.DeclType) string {
 
 func (m *Model) switchPanel() {
 	m.closePalette() // cambiar de panel cierra la paleta
+	m.closeCompletion()
+	m.clearPreview()
 	switch m.focus {
 	case FocusDecl:
 		// El panel 2 solo se habilita con al menos un objeto declarado
@@ -488,6 +512,17 @@ func (m *Model) updateLayout() {
 	}
 	if m.palette.Max > 7 {
 		m.palette.Max = 7
+	}
+
+	m.completion.Max = m.leftHeight() - chromeInH - 4
+	if m.completion.Max < 2 {
+		m.completion.Max = 2
+	}
+	if m.completion.Max > 7 {
+		m.completion.Max = 7
+	}
+	if m.completion.Open {
+		m.clampCompletion()
 	}
 }
 

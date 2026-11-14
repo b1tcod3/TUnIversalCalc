@@ -2,16 +2,17 @@ package ui
 
 import "github.com/charmbracelet/lipgloss"
 
-// Paleta de colores por panel
-const (
-	colorExprActive = "62"  // Morado
-	colorCalcActive = "42"  // Verde
-	colorOutput     = "205" // Rosa
-	colorInactive   = "240" // Gris oscuro
-	colorError      = "196" // Rojo
-	colorStep       = "220" // Amarillo
-	colorSuccess    = "42"
-	colorInfo       = "244"
+// Paleta adaptativa: Lipgloss elige el tono claro u oscuro según el fondo
+// de la terminal.
+var (
+	colorExprActive = lipgloss.AdaptiveColor{Light: "#7D4EBD", Dark: "#AF87FF"}
+	colorCalcActive = lipgloss.AdaptiveColor{Light: "#2E7D32", Dark: "#5FD787"}
+	colorOutput     = lipgloss.AdaptiveColor{Light: "#C2185B", Dark: "#FF87D7"}
+	colorInactive   = lipgloss.AdaptiveColor{Light: "#9E9E9E", Dark: "#585858"}
+	colorError      = lipgloss.AdaptiveColor{Light: "#C62828", Dark: "#FF5F5F"}
+	colorStep       = lipgloss.AdaptiveColor{Light: "#9A6700", Dark: "#FFD75F"}
+	colorSuccess    = lipgloss.AdaptiveColor{Light: "#2E7D32", Dark: "#5FD787"}
+	colorInfo       = lipgloss.AdaptiveColor{Light: "#6B6B6B", Dark: "#8A8A8A"}
 )
 
 // Estilo base de los paneles: borde redondeado. Los paneles 1 y 2 usan
@@ -29,23 +30,23 @@ var outputPanel = basePanel.
 // Variantes estáticas activo/inactivo — nunca se mutan desde View().
 var (
 	exprPanelInactive = inputPanel.
-				BorderForeground(lipgloss.Color(colorInactive))
+				BorderForeground(colorInactive)
 	exprPanelActive = inputPanel.
-			BorderForeground(lipgloss.Color(colorExprActive))
+			BorderForeground(colorExprActive)
 
 	calcPanelInactive = inputPanel.
-				BorderForeground(lipgloss.Color(colorInactive))
+				BorderForeground(colorInactive)
 	calcPanelActive = inputPanel.
-			BorderForeground(lipgloss.Color(colorCalcActive))
+			BorderForeground(colorCalcActive)
 
 	outputPanelStyle = outputPanel.
-				BorderForeground(lipgloss.Color(colorOutput))
+				BorderForeground(colorOutput)
 )
 
 var titleRightStyle = lipgloss.NewStyle().
 	Bold(true)
 
-func titleRight(title, short, color string, innerW int) string {
+func titleRight(title, short string, color lipgloss.TerminalColor, innerW int) string {
 	t := title
 	if innerW < visualWidth(title)+2 {
 		t = short
@@ -56,47 +57,47 @@ func titleRight(title, short, color string, innerW int) string {
 	return lipgloss.PlaceHorizontal(
 		innerW,
 		lipgloss.Right,
-		titleRightStyle.Foreground(lipgloss.Color(color)).Render(t),
+		titleRightStyle.Foreground(color).Render(t),
 	)
 }
 
 // Banner del nombre de la aplicación (panel derecho)
 var bannerStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color(colorExprActive)).
+	Foreground(colorExprActive).
 	Bold(true)
 
 // Colores por nivel de log
 var (
-	levelSuccessStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorSuccess)).Bold(true)
-	levelErrorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color(colorError)).Bold(true)
-	levelStepStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(colorStep))
-	levelInfoStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color(colorInfo))
+	levelSuccessStyle = lipgloss.NewStyle().Foreground(colorSuccess).Bold(true)
+	levelErrorStyle   = lipgloss.NewStyle().Foreground(colorError).Bold(true)
+	levelStepStyle    = lipgloss.NewStyle().Foreground(colorStep)
+	levelInfoStyle    = lipgloss.NewStyle().Foreground(colorInfo)
 )
 
 var helpStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color(colorInfo))
+	Foreground(colorInfo)
 
 var statusStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color(colorInactive))
+	Foreground(colorInactive)
 
 // Marca de la aplicación (panel derecho)
 var brandStyle = lipgloss.NewStyle().
-	Background(lipgloss.Color(colorExprActive)).
+	Background(colorExprActive).
 	Foreground(lipgloss.Color("255")).
 	Padding(0, 1).
 	Bold(true)
 
 // Aviso del panel 2 cuando está bloqueado
 var hintStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("244")).
+	Foreground(colorInfo).
 	Italic(true)
 
 // Estilos de la pantalla de ayuda
 var (
 	helpBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorOutput)).
+			BorderForeground(colorOutput).
 			Padding(0, 1)
-	helpTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorOutput))
-	helpFooterStyle = lipgloss.NewStyle().Foreground(lipgloss.Color(colorInfo))
+	helpTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(colorOutput)
+	helpFooterStyle = lipgloss.NewStyle().Foreground(colorInfo)
 )

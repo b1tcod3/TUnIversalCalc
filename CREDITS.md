@@ -33,6 +33,7 @@ correspondientes; una sección de créditos no sustituye a la licencia.
 | [Lipgloss](https://github.com/charmbracelet/lipgloss) | Estilos, paneles y layout | Charmbracelet, Inc. | MIT |
 | [Bubbles](https://github.com/charmbracelet/bubbles) | `textinput`, `viewport` y componentes reutilizables | Charmbracelet, Inc. | MIT |
 | [x/ansi](https://github.com/charmbracelet/x) | Ancho y recorte de texto con ANSI | Charmbracelet, Inc. | MIT |
+| [x/exp/teatest y golden](https://github.com/charmbracelet/x) | Pruebas de integración y golden files | Charmbracelet, Inc. | MIT |
 | [fuzzysearch](https://github.com/lithammer/fuzzysearch) | Coincidencia difusa de la paleta | Peter Lithammer | MIT |
 | [atotto/clipboard](https://github.com/atotto/clipboard) | Copiado al portapapeles | Ato Araki | BSD-3-Clause |
 | [Go](https://go.dev) | Lenguaje y toolchain | The Go Authors | BSD-3-Clause |
@@ -44,6 +45,5 @@ en el módulo correspondiente de `go.sum`.
 
 - El banner ASCII se generó con [`toilet`](https://github.com/cacalabs/toilet)
   usando la fuente `smblock`.
-- Las pruebas de integración de la TUI usan las utilidades de Bubble Tea. La
-  incorporación de `teatest` para pruebas de extremo a extremo queda como
-  trabajo futuro.
+- Las pruebas de integración de la TUI usan `teatest` y `golden` del
+  ecosistema Charmbracelet.

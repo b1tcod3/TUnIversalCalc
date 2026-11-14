@@ -18,6 +18,8 @@ func (m *Model) toggleHelp() {
 		return
 	}
 	m.closePalette()
+	m.closeCompletion()
+	m.clearPreview()
 	m.layoutHelp()
 	m.helpViewport.SetContent(helpText)
 	m.helpViewport.GotoTop()

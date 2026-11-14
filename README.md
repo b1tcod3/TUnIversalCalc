@@ -23,9 +23,12 @@ Calculadora TUI (interfaz de texto) en **Go** con **Bubble Tea**, construida con
 - Arquitectura Elm real: motor asíncrono vía `tea.Cmd` + `ResultMsg` (la UI no conoce el cálculo)
 - Redimensionamiento dinámico (`tea.WindowSizeMsg`), historial de comandos con `↑/↓`, estilos inmutables (sin mutación de globales en `View()`)
 - **Interpolación polinómica** (cálculo numérico): declaración de puntos con `/puntos` y dos caminos para el mismo polinomio único — Lagrange y Newton. Newton muestra la tabla completa de diferencias divididas. `symbolic.go` (parser Pratt + derivada/integral/etc. simbólicas) se conserva como base del parser.
-- **Sesiones persistentes con autosave**: el trabajo se guarda cada 30 segundos y al salir en `$XDG_DATA_HOME/tuniversalcalc/sessions` (o `~/.local/share/...`). Se puede abrir una sesión concreta por nombre o cambiar entre sesiones con `Ctrl+O`.
+- **Sesiones persistentes con autosave**: el trabajo se guarda cada 30 segundos y al salir en `$XDG_DATA_HOME/tuniversalcalc/sessions` (o `~/.local/share/...`). Se puede abrir una sesión concreta por nombre o cambiar entre sesiones con `Ctrl+O`; el selector permite renombrar (`Ctrl+R`), duplicar (`Ctrl+U`) y borrar (`Ctrl+D`).
 - **Undo/redo**: `Ctrl+Z` / `Ctrl+Y` con hasta 50 niveles, restaurando declaraciones, historial, foco y salida.
 - **Ayuda contextual**: `Ctrl+H` abre una pantalla de ayuda con scroll; `Esc` la cierra.
+- **Autocompletado en expresiones**: `Ctrl+Space` sugiere funciones, constantes y objetos declarados; `↑/↓` navega, `Tab`/`Enter` acepta y `Esc` cierra.
+- **Evaluación en vivo**: tras una pausa breve, el panel 2 muestra la última línea del resultado de la operación mientras escribes.
+- **Tema adaptativo**: los colores se ajustan automáticamente a terminales claras u oscuras.
 - **Ratón**: rueda para desplazar la salida y clic para cambiar de panel.
 - **Portapapeles**: `F2` copia la salida completa sin códigos ANSI.
 - **CLI**: `--session`, `--new`, `--list`, `--no-save`, `--version` y `--help`.
@@ -64,6 +67,9 @@ Las sesiones se guardan como JSON en `$XDG_DATA_HOME/tuniversalcalc/sessions/`
 El guardado es atómico y automático cada 30 segundos; también se guarda al salir.
 La barra de estado muestra la sesión activa y un `*` cuando hay cambios sin guardar.
 
+En el selector de sesiones (`Ctrl+O`): `↑/↓` navega, `Enter` abre, `Ctrl+R`
+renombra, `Ctrl+U` duplica, `Ctrl+D` borra (confirmación con `y`) y `Esc` cierra.
+
 ### Controles
 
 | Tecla            | Acción                                |
@@ -75,6 +81,8 @@ La barra de estado muestra la sesión activa y un `*` cuando hay cambios sin gua
 | `Ctrl+Z` / `Ctrl+Y` | Deshacer / rehacer |
 | `Ctrl+H`         | Abrir/cerrar la ayuda contextual |
 | `Ctrl+O`         | Abrir el selector de sesiones |
+| `Ctrl+R` / `Ctrl+U` / `Ctrl+D` | En el selector: renombrar / duplicar / borrar |
+| `Ctrl+Space`     | Autocompletar funciones, constantes u objetos |
 | `Ctrl+S`         | Guardar la sesión ahora |
 | `F2`             | Copiar la salida al portapapeles |
 | `PgUp` / `PgDn`  | Scroll del panel de salida |
@@ -116,7 +124,8 @@ Ambos producen el mismo polinomio único de grado ≤ n para n+1 puntos.
 ├── cmd/tuniversalcalc/     # Punto de entrada (flags, sesión y bootstrap de Bubble Tea)
 └── internal/
     ├── ui/                 # Interfaz: model, update, view, styles, templates, messages,
-    │                       # session, undo, help, textutil, mouse, clipboard, palette
+    │                       # session, sessionpicker, undo, help, completion, preview,
+    │                       # textutil, mouse, clipboard, palette
     ├── engine/             # Declaraciones + interpolación (Lagrange/Newton) + parser simbólico (symbolic.go)
     └── render/             # Renderizado Unicode y LaTeX emulado (superíndices, ∫, √, π, ∞)
 ```
@@ -131,7 +140,7 @@ Ambos producen el mismo polinomio único de grado ≤ n para n+1 puntos.
 
 ## Créditos
 
-- **Inspiración de UX:** [nascTUI](https://github.com/parnoldx/nascTUI), de [@parnoldx](https://github.com/parnoldx), bajo GPL-2.0. Las ideas de sesiones persistentes, autosave, undo/redo, ayuda contextual y soporte de ratón se reimplementaron para este proyecto; **no se copió código** de nascTUI. El autocompletado de funciones/variables y el modo hoja multilínea quedan como trabajo futuro.
+- **Inspiración de UX:** [nascTUI](https://github.com/parnoldx/nascTUI), de [@parnoldx](https://github.com/parnoldx), bajo GPL-2.0. Las ideas de sesiones persistentes, autosave, undo/redo, ayuda contextual, autocompletado, evaluación en vivo y soporte de ratón se reimplementaron para este proyecto; **no se copió código** de nascTUI. El modo hoja multilínea y el backend libqalculate quedan como trabajo futuro.
 - **Bubble Tea**, **Lipgloss**, **Bubbles** y **x/ansi** — [Charmbracelet](https://github.com/charmbracelet).
 - **fuzzysearch** — [lithammer/fuzzysearch](https://github.com/lithammer/fuzzysearch).
 - **Go** — [go.dev](https://go.dev).
