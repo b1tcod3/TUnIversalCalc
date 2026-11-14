@@ -23,6 +23,7 @@ Calculadora TUI (interfaz de texto) en **Go** con **Bubble Tea**, construida con
 - Arquitectura Elm real: motor asíncrono vía `tea.Cmd` + `ResultMsg` (la UI no conoce el cálculo)
 - Redimensionamiento dinámico (`tea.WindowSizeMsg`), historial de comandos con `↑/↓`, estilos inmutables (sin mutación de globales en `View()`)
 - **Interpolación polinómica** (cálculo numérico): declaración de puntos con `/puntos` y dos caminos para el mismo polinomio único — Lagrange y Newton. Newton muestra la tabla completa de diferencias divididas. `symbolic.go` (parser Pratt + derivada/integral/etc. simbólicas) se conserva como base del parser.
+- **Factorización de enteros**: al declarar `/expresion 120` o escribir `120` directamente en el panel 1 se detecta el entero y se muestra automáticamente su descomposición en factores primos. También se puede pedir con `/factorizar 120` o `/factorizar p1`. Usa rueda `6k±1`, Miller-Rabin determinista y Pollard Rho para números grandes.
 - **Sesiones persistentes con autosave**: el trabajo se guarda cada 30 segundos y al salir en `$XDG_DATA_HOME/tuniversalcalc/sessions` (o `~/.local/share/...`). Se puede abrir una sesión concreta por nombre o cambiar entre sesiones con `Ctrl+O`; el selector permite renombrar (`Ctrl+R`), duplicar (`Ctrl+U`) y borrar (`Ctrl+D`).
 - **Undo/redo**: `Ctrl+Z` / `Ctrl+Y` con hasta 50 niveles, restaurando declaraciones, historial, foco y salida.
 - **Ayuda contextual**: `Ctrl+H` abre una pantalla de ayuda con scroll; `Esc` la cierra.
@@ -114,8 +115,17 @@ El panel 2 permanece bloqueado (⛔) mientras no haya al menos un objeto declara
 
 - `/lagrange` — `/lagrange ?` — polinomio interpolador por el método de Lagrange (bases `L_i(x)` + suma ponderada)
 - `/newton` — `/newton ?` — polinomio interpolador por diferencias divididas (tabla completa + forma de Newton)
+- `/factorizar` — `/factorizar ?` — descomposición en factores primos de una expresión entera o de un literal (`/factorizar 120`)
 
-Ambos producen el mismo polinomio único de grado ≤ n para n+1 puntos.
+Ambos métodos de interpolación producen el mismo polinomio único de grado ≤ n para n+1 puntos.
+
+La factorización también se ejecuta sola al declarar una expresión que sea un entero literal:
+
+```text
+/expresion 120
+120
+→ 120 = 2³ · 3 · 5
+```
 
 ## Estructura del proyecto
 

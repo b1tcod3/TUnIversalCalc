@@ -98,6 +98,9 @@ func (m *Model) previewTarget(cmd string) (engine.Decl, string, bool) {
 	if len(toks) == 0 {
 		return engine.Decl{}, "", false
 	}
+	if d, ok := m.literalIntegerDecl(cmd); ok {
+		return d, "x", true
+	}
 	objName, varName := "", "x"
 	if len(toks) >= 2 {
 		name := toks[1]

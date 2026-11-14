@@ -9,6 +9,9 @@ func TestParseDecl(t *testing.T) {
 	}{
 		{"", true},
 		{"2x+2", true},
+		{"120", false},
+		{"-12", false},
+		{"12.5", true},
 		{"/funcion 2x+2", false},
 		{"/funcion", true},
 		{"/funcion   ", true},
@@ -101,5 +104,19 @@ func TestParseDeclPuntos(t *testing.T) {
 func TestDeclType(t *testing.T) {
 	if DeclEcuacion.String() != "ecuación" || DeclFuncion.Prefix() != "f" || DeclExpresion.Prefix() != "p" {
 		t.Fatalf("DeclType String/Prefix incorrectos")
+	}
+}
+
+func TestParseDeclEnteroSuelto(t *testing.T) {
+	d, err := ParseDecl("120")
+	if err != nil {
+		t.Fatalf("entero suelto rechazado: %v", err)
+	}
+	if d.Tipo != DeclExpresion || d.Raw != "120" || d.Latex != "120" {
+		t.Fatalf("entero mal clasificado: %+v", d)
+	}
+	d, err = ParseDecl("-12")
+	if err != nil || d.Raw != "-12" || d.Pretty != "−12" {
+		t.Fatalf("negativo mal clasificado: %+v, %v", d, err)
 	}
 }

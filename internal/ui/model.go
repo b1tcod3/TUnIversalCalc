@@ -96,7 +96,7 @@ type Model struct {
 
 func NewModel() Model {
 	declTi := textinput.New()
-	declTi.Placeholder = "ej. /puntos (1,2) (3,4), /funcion 2x+2"
+	declTi.Placeholder = "ej. 120, /puntos (1,2) (3,4), /funcion 2x+2"
 	declTi.Prompt = "❯ "
 	declTi.CharLimit = 200
 	declTi.Focus()
@@ -121,7 +121,7 @@ func NewModel() Model {
 		counters:     map[engine.DeclType]int{},
 		outputLog: []LogEntry{
 			{Level: LevelInfo, Content: "Bienvenido a TUnIversalCalc"},
-			{Level: LevelInfo, Content: "1. Declara un objeto: /puntos (1,2) (3,4), /funcion 2x+2 o /ecuacion 2x+2=0"},
+			{Level: LevelInfo, Content: "1. Declara un entero o un objeto: 120, /puntos (1,2) (3,4), /funcion 2x+2"},
 			{Level: LevelInfo, Content: "2. Interpola por nombre o sobre el último objeto: /lagrange t1, /newton"},
 			{Level: LevelInfo, Content: "Atajos: Ctrl+H ayuda · Ctrl+Z/Ctrl+Y deshacer/rehacer · Ctrl+S guardar"},
 		},

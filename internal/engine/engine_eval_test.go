@@ -88,6 +88,42 @@ func TestEvaluateOperacionesRequierenPuntos(t *testing.T) {
 	}
 }
 
+func TestEvaluateFactorizar(t *testing.T) {
+	d := Decl{Nombre: "p1", Tipo: DeclExpresion, Raw: "120", Latex: "120", Pretty: "120"}
+	steps, err := evalDecl(t, d, "/factorizar")
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	all := strings.Join(steps, "|")
+	for _, frag := range []string{"N = 120", "÷2 (3 veces)", "÷3 (1 vez)", "Factorización: 2³ · 3 · 5", "Forma expandida: 2 · 2 · 2 · 3 · 5"} {
+		if !strings.Contains(all, frag) {
+			t.Fatalf("falta %q en: %s", frag, all)
+		}
+	}
+}
+
+func TestEvaluateFactorizarErrores(t *testing.T) {
+	// Solo expresiones enteras.
+	puntos := Decl{Nombre: "t1", Tipo: DeclPuntos, Raw: "(1,2) (3,4)"}
+	if _, err := evalDecl(t, puntos, "/factorizar"); err == nil ||
+		!strings.Contains(err.Error(), "expresión entera") {
+		t.Fatalf("puntos deben fallar: %v", err)
+	}
+
+	// Decimales no son enteros literales.
+	dec := Decl{Nombre: "p1", Tipo: DeclExpresion, Raw: "12.5", Latex: "12.5"}
+	if _, err := evalDecl(t, dec, "/factorizar"); err == nil ||
+		!strings.Contains(err.Error(), "entero literal") {
+		t.Fatalf("12.5 debe fallar: %v", err)
+	}
+
+	// Una función tampoco es una expresión entera.
+	fn := Decl{Nombre: "f1", Tipo: DeclFuncion, Raw: "120", Latex: "120"}
+	if _, err := evalDecl(t, fn, "/factorizar"); err == nil {
+		t.Fatal("una función debe fallar")
+	}
+}
+
 func TestEvaluateErrors(t *testing.T) {
 	// operación desconocida
 	if _, err := evalDecl(t, puntosColineales(), "/voltear t1"); err == nil ||

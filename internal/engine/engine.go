@@ -58,9 +58,11 @@ func evalOp(decl Decl, op string) ([]string, error) {
 		return evalLagrange(decl)
 	case strings.HasPrefix(word, "newton"):
 		return evalNewton(decl)
+	case strings.HasPrefix(word, "factor"):
+		return evalFactorizar(decl)
 	default:
 		return nil, fmt.Errorf(
-			"operación no reconocida: %q — usa /lagrange o /newton",
+			"operación no reconocida: %q — usa /lagrange, /newton o /factorizar",
 			word,
 		)
 	}

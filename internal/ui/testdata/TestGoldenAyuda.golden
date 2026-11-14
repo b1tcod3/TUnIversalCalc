@@ -1,24 +1,23 @@
-                                                                                
- ╭────────────────────────────────────────────────────────────────────────────╮ 
- │ Ayuda de TUnIversalCalc                                                    │ 
- │                                                                            │ 
- │ TUnIversalCalc — calculadora TUI                                           │ 
- │ ================================                                           │ 
- │                                                                            │ 
- │ Flujo rápido                                                               │ 
- │ ------------                                                               │ 
- │ 1. En el panel 1 declara un objeto con un slash-command.                   │ 
- │ 2. Pulsa Enter: el objeto se guarda con auto-nombre.                       │ 
- │ 3. En el panel 2 escribe la operación sobre ese objeto.                    │ 
- │ 4. La salida paso a paso aparece en el panel derecho.                      │ 
- │                                                                            │ 
- │ Panel 1 — declaración                                                      │ 
- │ ---------------------                                                      │ 
- │   /puntos (1,2) (3,4) (5,6)   Puntos para interpolar                       │ 
- │   /funcion 2x+2               Función sin "="                              │ 
- │   /expresion x^2+1            Expresión sin "="                            │ 
- │   /ecuacion 2x+2=0            Ecuación con un "="                          │ 
- │                                                                            │ 
- │ ↑/↓ línea · PgUp/PgDn página · Esc o Ctrl+H cerrar                         │ 
- ╰────────────────────────────────────────────────────────────────────────────╯ 
-                                                                                
+
+ ╭────────────────────────────────────────────────────────────────────────────╮
+ │ Ayuda de TUnIversalCalc                                                    │
+ │                                                                            │
+ │ TUnIversalCalc — calculadora TUI                                           │
+ │ ================================                                           │
+ │                                                                            │
+ │ Flujo rápido                                                               │
+ │ ------------                                                               │
+ │ 1. En el panel 1 declara un objeto o escribe un entero.                    │
+ │    Ejemplos: 120, /puntos (1,2) (3,4), /funcion 2x+2.                      │
+ │ 2. Pulsa Enter: el objeto se guarda con auto-nombre.                       │
+ │ 3. En el panel 2 escribe la operación sobre ese objeto.                    │
+ │ 4. La salida paso a paso aparece en el panel derecho.                      │
+ │                                                                            │
+ │ Panel 1 — declaración                                                      │
+ │ ---------------------                                                      │
+ │   /puntos (1,2) (3,4) (5,6)   Puntos para interpolar                       │
+ │   /funcion 2x+2               Función sin "="                              │
+ │   /expresion x^2+1            Expresión sin "="                            │
+ │                                                                            │
+ │ ↑/↓ línea · PgUp/PgDn página · Esc o Ctrl+H cerrar                         │
+ ╰────────────────────────────────────────────────────────────────────────────╯

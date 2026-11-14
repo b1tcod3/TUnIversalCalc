@@ -13,6 +13,7 @@ type Template struct {
 // Registro de plantillas de OPERACIÓN (panel 2). Los objetos no hacen
 // falta citarlos: si se omite el nombre, se opera sobre el último.
 var opsRegistry = []Template{
+	{Trigger: "factorizar", InsertText: "/factorizar ?", Desc: "Descomposición en factores primos"},
 	{Trigger: "lagrange", InsertText: "/lagrange ?", Desc: "Interpolación de Lagrange"},
 	{Trigger: "newton", InsertText: "/newton ?", Desc: "Interpolación de Newton (diferencias divididas)"},
 }

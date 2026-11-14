@@ -60,13 +60,19 @@ type Decl struct {
 	Points []Point  `json:"points"` // puntos para DeclPuntos
 }
 
-// ParseDecl valida y clasifica una declaración del panel 1. Siempre debe
-// llevar slash-command y devuelve un error "inteligente" si no lo lleva
-// o el comando no existe. El nombre se asigna después (auto-nombre).
+// ParseDecl valida y clasifica una declaración del panel 1. Acepta
+// slash-commands y, como atajo, un entero literal suelto. Devuelve un error
+// "inteligente" si no reconoce la entrada. El nombre se asigna después
+// (auto-nombre).
 func ParseDecl(raw string) (Decl, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
 		return Decl{}, fmt.Errorf("declaración vacía: usa /ecuacion, /funcion o /expresion")
+	}
+	// Un entero literal suelto se considera una expresión: es la vía más
+	// directa para factorizar (120 → p1 = 120).
+	if n, ok := ParseIntegerLiteral(s); ok {
+		return IntegerDecl(n), nil
 	}
 	if !strings.HasPrefix(s, "/") {
 		return Decl{}, fmt.Errorf("el panel 1 es de declaración: usa /ecuacion, /funcion o /expresion")

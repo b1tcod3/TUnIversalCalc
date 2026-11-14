@@ -285,3 +285,76 @@ func TestPlantillaYDeclaracionInvalida(t *testing.T) {
 		t.Fatalf("error esperado por '=' en función: %+v", last)
 	}
 }
+
+func TestExpresionEnteraAutoFactoriza(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/expresion 120")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("una expresión entera debe lanzar la factorización automática")
+	}
+	res, ok := cmd().(ResultMsg)
+	if !ok || res.Err != nil {
+		t.Fatalf("ResultMsg inesperado: %+v", res)
+	}
+	all := strings.Join(res.Steps, " ")
+	if !strings.Contains(all, "Factorización: 2³ · 3 · 5") {
+		t.Fatalf("pasos sin factorización: %q", all)
+	}
+	m.applyResult(res)
+	if !strings.Contains(m.plainOutput(), "2³ · 3 · 5") {
+		t.Fatal("la salida no contiene la factorización")
+	}
+	if _, ok := m.objs["p1"]; !ok {
+		t.Fatalf("p1 no declarada: %+v", m.objs)
+	}
+}
+
+func TestEnteroSueltoAutoFactoriza(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("120")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("un entero suelto debe lanzar la factorización automática")
+	}
+	res, ok := cmd().(ResultMsg)
+	if !ok || res.Err != nil {
+		t.Fatalf("ResultMsg inesperado: %+v", res)
+	}
+	if !strings.Contains(strings.Join(res.Steps, " "), "2³ · 3 · 5") {
+		t.Fatalf("pasos sin factorización: %q", res.Steps)
+	}
+	if d, ok := m.objs["p1"]; !ok || d.Raw != "120" {
+		t.Fatalf("p1 no declarada como entero: %+v", m.objs)
+	}
+}
+
+func TestExpresionDecimalNoAutoFactoriza(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/expresion 12.5")
+	if cmd := m.handleEnter(); cmd != nil {
+		t.Fatal("12.5 no debe disparar factorización automática")
+	}
+	if _, ok := m.objs["p1"]; !ok {
+		t.Fatalf("p1 no declarada: %+v", m.objs)
+	}
+}
+
+func TestFactorizarLiteral(t *testing.T) {
+	m := newFlowModel()
+	declararEcuacionYFuncion(t, &m)
+
+	m.cmdInput.SetValue("/factorizar 120")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("debe lanzarse la factorización")
+	}
+	res, ok := cmd().(ResultMsg)
+	if !ok || res.Err != nil {
+		t.Fatalf("ResultMsg inesperado: %+v", res)
+	}
+	all := strings.Join(res.Steps, " ")
+	if !strings.Contains(all, "Factorización: 2³ · 3 · 5") {
+		t.Fatalf("pasos sin factorización: %q", all)
+	}
+}

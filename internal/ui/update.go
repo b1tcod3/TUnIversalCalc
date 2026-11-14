@@ -294,11 +294,23 @@ func (m *Model) handleEnter() tea.Cmd {
 		m.addLog(LevelSuccess, d.Nombre+" declarada: "+d.Latex)
 		m.addLog(LevelStep, d.Pretty)
 		m.switchPanel()
+
+		// Detección automática: una expresión que sea un entero literal se
+		// factoriza sin que el usuario tenga que pedirlo.
+		if d.Tipo == engine.DeclExpresion {
+			if _, ok := engine.ParseIntegerLiteral(d.Raw); ok {
+				m.reqSeq++
+				m.pendingReq = m.reqSeq
+				return evaluateCmd(d, "/factorizar", "x", m.pendingReq)
+			}
+		}
 		return nil
 
 	case FocusCmd:
 		if !m.declValid {
-			return nil
+			if _, ok := m.literalIntegerDecl(m.cmdInput.Value()); !ok {
+				return nil
+			}
 		}
 		if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
 			m.pushUndo()
@@ -339,6 +351,9 @@ func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
 	if len(toks) == 0 {
 		return engine.Decl{}, "", false
 	}
+	if d, ok := m.literalIntegerDecl(cmd); ok {
+		return d, "x", true
+	}
 	objName, varName := "", "x"
 	if len(toks) >= 2 {
 		name := toks[1]
@@ -362,6 +377,25 @@ func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
 		return engine.Decl{}, "", false
 	}
 	return m.objs[objName], varName, true
+}
+
+// literalIntegerDecl permite usar /factorizar 120 sin declarar el número
+// como objeto. Solo aplica al comando de factorización.
+func (m *Model) literalIntegerDecl(cmd string) (engine.Decl, bool) {
+	toks := splitCommandTokens(normalizeCommandArgs(cmd))
+	if len(toks) < 2 || !isFactorCommand(toks[0]) {
+		return engine.Decl{}, false
+	}
+	n, ok := engine.ParseIntegerLiteral(toks[1])
+	if !ok {
+		return engine.Decl{}, false
+	}
+	return engine.IntegerDecl(n), true
+}
+
+func isFactorCommand(tok string) bool {
+	tok = strings.ToLower(strings.TrimPrefix(tok, "/"))
+	return strings.HasPrefix(tok, "factor")
 }
 
 // autoName asigna el siguiente nombre automático para el tipo: e1, e2...

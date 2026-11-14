@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,5 +36,11 @@ func TestGoldenAyuda(t *testing.T) {
 	m.width, m.height = 80, 24
 	m.updateLayout()
 	m.toggleHelp()
-	golden.RequireEqual(t, []byte(ansi.Strip(m.helpView())))
+	out := ansi.Strip(m.helpView())
+	lines := strings.Split(out, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	out = strings.TrimRight(strings.Join(lines, "\n"), "\n")
+	golden.RequireEqual(t, []byte(out))
 }

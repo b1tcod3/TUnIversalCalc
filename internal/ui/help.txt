@@ -3,7 +3,8 @@ TUnIversalCalc — calculadora TUI
 
 Flujo rápido
 ------------
-1. En el panel 1 declara un objeto con un slash-command.
+1. En el panel 1 declara un objeto o escribe un entero.
+   Ejemplos: 120, /puntos (1,2) (3,4), /funcion 2x+2.
 2. Pulsa Enter: el objeto se guarda con auto-nombre.
 3. En el panel 2 escribe la operación sobre ese objeto.
 4. La salida paso a paso aparece en el panel derecho.
@@ -23,6 +24,10 @@ Panel 2 — operaciones
 ---------------------
   /lagrange [objeto]   Polinomio interpolador de Lagrange
   /newton   [objeto]   Interpolación por diferencias divididas
+  /factorizar [n]      Factores primos de un entero o de un objeto
+
+Un /expresion con un entero literal (por ejemplo /expresion 120)
+muestra automáticamente su factorización.
 
 Paleta de comandos
 ------------------

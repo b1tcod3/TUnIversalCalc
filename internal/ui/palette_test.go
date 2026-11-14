@@ -39,7 +39,7 @@ func TestBuildPalette(t *testing.T) {
 		t.Fatalf("declaraciones no alfabéticas: %v", names(decl))
 	}
 	ops := buildPalette(opsRegistry, "")
-	if !reflect.DeepEqual(names(ops), []string{"lagrange", "newton"}) {
+	if !reflect.DeepEqual(names(ops), []string{"factorizar", "lagrange", "newton"}) {
 		t.Fatalf("operaciones no alfabéticas: %v", names(ops))
 	}
 
