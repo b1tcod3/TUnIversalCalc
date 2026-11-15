@@ -44,6 +44,35 @@ func TestHelpScroll(t *testing.T) {
 	}
 }
 
+func TestHelpTeclasDeScroll(t *testing.T) {
+	m := newFlowModel()
+	m.toggleHelp()
+
+	before := m.helpViewport.YOffset
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyPgDown}); !handled {
+		t.Fatal("PgDn debe manejarse en la ayuda")
+	}
+	if m.helpViewport.YOffset <= before {
+		t.Fatal("PgDn no desplazó la ayuda")
+	}
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyPgUp}); !handled {
+		t.Fatal("PgUp debe manejarse en la ayuda")
+	}
+
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}); !handled {
+		t.Fatal("j debe manejarse en la ayuda")
+	}
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}); !handled {
+		t.Fatal("k debe manejarse en la ayuda")
+	}
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}); !handled {
+		t.Fatal("q debe manejarse en la ayuda")
+	}
+	if m.helpOpen {
+		t.Fatal("q debe cerrar la ayuda")
+	}
+}
+
 func TestHelpEnTerminalPequena(t *testing.T) {
 	m := NewModel()
 	m.width, m.height = 40, 12

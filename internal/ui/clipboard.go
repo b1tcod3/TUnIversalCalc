@@ -7,6 +7,9 @@ import (
 	"github.com/atotto/clipboard"
 )
 
+// writeClipboard permite sustituir el portapapeles del sistema en tests.
+var writeClipboard = clipboard.WriteAll
+
 // copyOutput copia al portapapeles la salida completa sin códigos ANSI.
 func (m *Model) copyOutput() {
 	text := strings.TrimSpace(m.plainOutput())
@@ -14,7 +17,7 @@ func (m *Model) copyOutput() {
 		m.addLog(LevelInfo, "No hay salida para copiar")
 		return
 	}
-	if err := clipboard.WriteAll(text); err != nil {
+	if err := writeClipboard(text); err != nil {
 		m.addLog(LevelError, "No se pudo copiar al portapapeles: "+err.Error())
 		return
 	}

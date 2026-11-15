@@ -59,6 +59,8 @@ func TestDerive(t *testing.T) {
 		{"1/x", "-1/x^2"},
 		{"3x^2*2x", "18*x^2"},
 		{"x^(1/2)", "1/2*x^-0.5"},
+		{"-x", "-1"},
+		{"-x^2", "-2*x"},
 	}
 	for _, c := range cases {
 		r, steps, err := Derive(mustParse(t, c.in), 'x')
@@ -221,24 +223,63 @@ func TestIntegrateUnsupported(t *testing.T) {
 
 func TestLimitSubstitution(t *testing.T) {
 	cases := []struct {
+		name string
 		in   string
 		val  Value
 		want string
 	}{
-		{"x^2+1", Value{Val: 2}, "5"},
-		{"sin(x)/x", Value{Val: 0}, "1"}, // L'Hôpital
-		{"x^2-1", Value{Val: 1}, "0"},
-		{"x^2", Value{IsInf: true, Sign: 1}, "inf"},
-		{"1/x^2", Value{IsInf: true, Sign: 1}, "0"},
+		{"sustitucion directa", "x^2+1", Value{Val: 2}, "5"},
+		{"lhopital", "sin(x)/x", Value{Val: 0}, "1"},
+		{"polinomio en 1", "x^2-1", Value{Val: 1}, "0"},
+		{"potencia en infinito", "x^2", Value{IsInf: true, Sign: 1}, "inf"},
+		{"inverso en infinito", "1/x^2", Value{IsInf: true, Sign: 1}, "0"},
+		{"suma en infinito", "x^2+3x+1", Value{IsInf: true, Sign: 1}, "inf"},
+		{"negativo en infinito", "-x^2+5", Value{IsInf: true, Sign: 1}, "-inf"},
+		{"producto en infinito", "(x+1)*(x+2)", Value{IsInf: true, Sign: 1}, "inf"},
+		{"cociente en infinito", "(x+1)/(x+2)", Value{IsInf: true, Sign: 1}, "1"},
+		{"cubo en menos infinito", "x^3", Value{IsInf: true, Sign: -1}, "-inf"},
+		{"cuadrado en menos infinito", "x^2", Value{IsInf: true, Sign: -1}, "inf"},
 	}
 	for _, c := range cases {
-		r, _, err := Limit(mustParse(t, c.in), 'x', c.val)
-		if err != nil {
-			t.Fatalf("Limit(%q, %v): %v", c.in, c.val, err)
-		}
-		if got := r.Ascii(); got != c.want {
-			t.Errorf("Limit(%q, %v) = %q, se esperaba %q", c.in, c.val, got, c.want)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			r, _, err := Limit(mustParse(t, c.in), 'x', c.val)
+			if err != nil {
+				t.Fatalf("Limit(%q, %v): %v", c.in, c.val, err)
+			}
+			if got := r.Ascii(); got != c.want {
+				t.Fatalf("Limit(%q, %v) = %q, se esperaba %q", c.in, c.val, got, c.want)
+			}
+		})
+	}
+}
+
+func TestSimplifyPublicAPI(t *testing.T) {
+	cases := []struct {
+		name  string
+		in    string
+		want  string
+		steps int
+	}{
+		{"agrupa terminos", "2x+3x", "5*x", 2},
+		{"ya simplificada", "x", "x", 1},
+		{"potencia numerica", "2^3", "8", 2},
+		{"potencia indefinida", "0^-1", "0^-1", 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			got, steps, err := Simplify(mustParse(t, c.in))
+			if err != nil {
+				t.Fatalf("Simplify(%q): %v", c.in, err)
+			}
+			if got.Ascii() != c.want {
+				t.Fatalf("Simplify(%q) = %q, se esperaba %q", c.in, got.Ascii(), c.want)
+			}
+			if len(steps) != c.steps {
+				t.Fatalf("Simplify(%q): %d pasos, se esperaban %d", c.in, len(steps), c.steps)
+			}
+		})
 	}
 }
 

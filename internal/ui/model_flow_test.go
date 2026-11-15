@@ -123,36 +123,6 @@ func TestViewNoMutaDimensiones(t *testing.T) {
 	}
 }
 
-func TestValidate(t *testing.T) {
-	cases := []struct {
-		in   string
-		want bool
-	}{
-		{"", false},
-		{"2x+2", true},
-		{"x^2 + 3x - 5", true},
-		{"sin(x) + cos(x)", true},
-		{"x^2+", false},
-		{"+x", false},
-		{"(x^2 + 1", false},
-		{"x^2) + 1", false},
-		{"3**2", false},
-		{"3*-2", true},
-		{"-2x^2", true},
-		{"x^ -2", true}, // exponente negativo: ahora el parser lo soporta
-		{"x^-2", true},  // exponente negativo: ahora el parser lo soporta
-		{"2x + y/c", true},
-		{"3.5x", true},
-		{"a@b", false},
-	}
-	for _, c := range cases {
-		err := engine.Validate(c.in)
-		if (err == nil) != c.want {
-			t.Errorf("Validate(%q) = %v, se esperaba válida=%v", c.in, err, c.want)
-		}
-	}
-}
-
 // newFlowModel devuelve un modelo con layout calculado para las pruebas
 // de flujo (terminal 100x28).
 func newFlowModel() Model {

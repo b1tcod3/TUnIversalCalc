@@ -104,7 +104,10 @@ func nextExponent(s string, start int) (string, int) {
 		return ToSuperscript(s[start+1 : k-1]), k
 	}
 	k := start
-	for k < len(s) && (isAlnum(s[k]) || s[k] == '+' || s[k] == '-') {
+	if s[k] == '+' || s[k] == '-' {
+		k++ // signo del exponente: x^-2
+	}
+	for k < len(s) && isAlnum(s[k]) {
 		k++
 	}
 	return ToSuperscript(s[start:k]), k

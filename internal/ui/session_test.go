@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 	"tuniversalcalc/internal/engine"
 )
@@ -107,6 +108,79 @@ func TestSessionListAndLast(t *testing.T) {
 	}
 	if SessionExists("hoy") {
 		t.Fatal("la sesión eliminada sigue existiendo")
+	}
+}
+
+func TestManualSave(t *testing.T) {
+	withTempSessions(t)
+	m := newFlowModel()
+	if err := m.OpenSession("trabajo"); err != nil {
+		t.Fatalf("OpenSession: %v", err)
+	}
+	m.addLog(LevelInfo, "cambio pendiente")
+
+	cmd := m.manualSave()
+	if cmd == nil {
+		t.Fatal("manualSave debe devolver un comando con sesión activa")
+	}
+	msg, ok := cmd().(sessionSavedMsg)
+	if !ok {
+		t.Fatalf("mensaje inesperado: %T", msg)
+	}
+	if msg.err != nil {
+		t.Fatalf("no se pudo guardar: %v", msg.err)
+	}
+	if !SessionExists("trabajo") {
+		t.Fatal("la sesión no se guardó en disco")
+	}
+}
+
+func TestManualSaveSinSesion(t *testing.T) {
+	m := newFlowModel()
+	if cmd := m.manualSave(); cmd != nil {
+		t.Fatal("manualSave no debe guardar sin sesión activa")
+	}
+	if !strings.Contains(m.plainOutput(), "Sesión no habilitada") {
+		t.Fatalf("falta el aviso de sesión no habilitada: %q", m.plainOutput())
+	}
+}
+
+func TestDisableSession(t *testing.T) {
+	withTempSessions(t)
+	m := newFlowModel()
+	if err := m.OpenSession("trabajo"); err != nil {
+		t.Fatalf("OpenSession: %v", err)
+	}
+	m.dirty = true
+
+	m.DisableSession()
+	if m.sessionEnabled || m.SessionName() != "" || m.dirty {
+		t.Fatalf("sesión no deshabilitada: enabled=%v name=%q dirty=%v",
+			m.sessionEnabled, m.SessionName(), m.dirty)
+	}
+	if cmd := m.manualSave(); cmd != nil {
+		t.Fatal("manualSave no debe guardar con la sesión deshabilitada")
+	}
+}
+
+func TestAutosaveTick(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		m := newFlowModel()
+		cmd := m.autosaveTick()
+		if cmd == nil {
+			t.Fatal("autosaveTick debe devolver un comando")
+		}
+		if _, ok := cmd().(autosaveMsg); !ok {
+			t.Fatalf("mensaje inesperado: %T", cmd())
+		}
+	})
+}
+
+func TestOpenSessionNombreInvalido(t *testing.T) {
+	withTempSessions(t)
+	m := newFlowModel()
+	if err := m.OpenSession("   "); err == nil {
+		t.Fatal("un nombre vacío debe devolver error")
 	}
 }
 

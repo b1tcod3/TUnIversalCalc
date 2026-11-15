@@ -235,6 +235,10 @@ func simplifyPow(n Pow) Expr {
 		case 1:
 			return base
 		case -1:
+			if bf, ok := matchNum(base); ok && bf == 0 {
+				// 0^(-1) es indefinido: no lo representamos como 1/0.
+				return Pow{Base: base, Exp: exp}
+			}
 			// x^(-1) se muestra como 1/x
 			return Div{Num: Num{Text: "1"}, Den: base}
 		}
@@ -880,6 +884,10 @@ func limitInf(e Expr, v byte, sign int, steps []string) (Expr, []string, error) 
 		return Num{Text: "0"}, steps, nil
 	case deg == 0:
 		return Num{Text: NumFromFloat(lead).Text}, steps, nil
+	}
+	if deg%2 == 0 {
+		// Una potencia par es positiva en ambos extremos: (-∞)^2 = +∞.
+		sign = 1
 	}
 	trend := lead * float64(sign)
 	if trend > 0 {

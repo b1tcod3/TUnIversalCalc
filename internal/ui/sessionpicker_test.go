@@ -138,6 +138,77 @@ func TestSessionPickerDuplicar(t *testing.T) {
 	}
 }
 
+func TestSessionPickerRenombrarConTeclas(t *testing.T) {
+	seedSessions(t)
+	m := newFlowModel()
+	m.sessionName = "alfa"
+	m.sessionEnabled = true
+	m.openSessionPicker()
+	m.picker.query.SetValue("alfa")
+	m.picker.clamp()
+
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlR}); !handled {
+		t.Fatal("Ctrl+R debe manejarse")
+	}
+	if m.picker.mode != pickerRename {
+		t.Fatalf("modo = %v, se esperaba rename", m.picker.mode)
+	}
+	m.picker.nameInput.SetValue("gamma")
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyEnter}); !handled {
+		t.Fatal("Enter debe confirmar el renombrado")
+	}
+	if m.picker.mode != pickerBrowse {
+		t.Fatalf("modo tras renombrar = %v", m.picker.mode)
+	}
+	if !SessionExists("gamma") || SessionExists("alfa") {
+		t.Fatal("el archivo no se renombró con las teclas")
+	}
+}
+
+func TestSessionPickerRenombrarCancelar(t *testing.T) {
+	seedSessions(t)
+	m := newFlowModel()
+	m.sessionName = "alfa"
+	m.sessionEnabled = true
+	m.openSessionPicker()
+	m.picker.query.SetValue("alfa")
+	m.picker.clamp()
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlR})
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyEsc}); !handled {
+		t.Fatal("Esc debe manejarse durante el renombrado")
+	}
+	if m.picker.mode != pickerBrowse {
+		t.Fatalf("Esc no canceló el renombrado: %v", m.picker.mode)
+	}
+	if !SessionExists("alfa") {
+		t.Fatal("cancelar el renombrado no debe borrar la sesión")
+	}
+}
+
+func TestSessionPickerBorrarConTeclas(t *testing.T) {
+	seedSessions(t)
+	m := newFlowModel()
+	m.sessionName = "beta"
+	m.sessionEnabled = true
+	m.openSessionPicker()
+	m.picker.query.SetValue("alfa")
+	m.picker.clamp()
+
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlD}); !handled {
+		t.Fatal("Ctrl+D debe manejarse")
+	}
+	if m.picker.mode != pickerConfirmDelete {
+		t.Fatalf("modo = %v, se esperaba confirm-delete", m.picker.mode)
+	}
+	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}); !handled {
+		t.Fatal("y debe confirmar el borrado")
+	}
+	if SessionExists("alfa") {
+		t.Fatal("alfa no se borró con las teclas")
+	}
+}
+
 func TestSessionPickerBorrar(t *testing.T) {
 	seedSessions(t)
 	m := newFlowModel()
