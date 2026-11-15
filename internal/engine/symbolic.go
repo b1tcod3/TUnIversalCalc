@@ -317,7 +317,13 @@ func mergeMulBases(facts []Expr) (float64, []Expr) {
 	for _, f := range facts {
 		switch ff := f.(type) {
 		case Num:
-			v, _ := ff.Float()
+			v, err := ff.Float()
+			if err != nil {
+				// Un Num con texto inválido no debería llegar aquí; se
+				// conserva como factor en vez de corromper el coeficiente.
+				rest = append(rest, f)
+				continue
+			}
 			coeff *= v
 		default:
 			base, expo := ff, Expr(Num{Text: "1"})
@@ -851,7 +857,12 @@ func lHopital(f Expr, v byte) Expr {
 			}
 		}
 	}
-	f2, _, _ := Derive(f, v)
+	f2, _, err := Derive(f, v)
+	if err != nil {
+		// Si no se puede derivar, se mantiene f y el bucle de Limit acabará
+		// devolviendo "límite indeterminado" en lugar de usar un nil.
+		return f
+	}
 	return simplifyNormaliza(f2)
 }
 

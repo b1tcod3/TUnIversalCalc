@@ -159,7 +159,7 @@ func LoadSession(name string) (SessionData, error) {
 	var data SessionData
 	raw, err := os.ReadFile(sessionPath(name))
 	if err != nil {
-		return data, err
+		return data, fmt.Errorf("leyendo sesión %q: %w", name, err)
 	}
 	if err := json.Unmarshal(raw, &data); err != nil {
 		return data, fmt.Errorf("sesión %q corrupta: %w", name, err)
@@ -179,19 +179,22 @@ func SaveSession(name string, data SessionData) error {
 	normalizeSession(&data)
 	payload, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("serializando sesión %q: %w", name, err)
 	}
 	payload = append(payload, '\n')
 	if err := atomicWrite(sessionPath(name), payload); err != nil {
-		return err
+		return fmt.Errorf("guardando sesión %q: %w", name, err)
 	}
-	return atomicWrite(lastSessionPath(), []byte(name+"\n"))
+	if err := atomicWrite(lastSessionPath(), []byte(name+"\n")); err != nil {
+		return fmt.Errorf("actualizando última sesión: %w", err)
+	}
+	return nil
 }
 
 // DeleteSession elimina una sesión y limpia el puntero de última sesión.
 func DeleteSession(name string) error {
 	if err := os.Remove(sessionPath(name)); err != nil {
-		return err
+		return fmt.Errorf("borrando sesión %q: %w", name, err)
 	}
 	if data, err := os.ReadFile(lastSessionPath()); err == nil {
 		if sanitizeSessionName(strings.TrimSpace(string(data))) == name {
@@ -219,7 +222,7 @@ func RenameSession(oldName, newName string) error {
 		return fmt.Errorf("la sesión %q ya existe", newName)
 	}
 	if err := os.Rename(sessionPath(oldName), sessionPath(newName)); err != nil {
-		return err
+		return fmt.Errorf("renombrando sesión %q a %q: %w", oldName, newName, err)
 	}
 	if data, err := os.ReadFile(lastSessionPath()); err == nil {
 		if sanitizeSessionName(strings.TrimSpace(string(data))) == oldName {
@@ -233,11 +236,11 @@ func RenameSession(oldName, newName string) error {
 func DuplicateSession(name string) (string, error) {
 	payload, err := os.ReadFile(sessionPath(name))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("leyendo sesión %q: %w", name, err)
 	}
 	copyName := uniqueSessionName(name + " copia")
 	if err := atomicWrite(sessionPath(copyName), payload); err != nil {
-		return "", err
+		return "", fmt.Errorf("duplicando sesión %q: %w", name, err)
 	}
 	return copyName, nil
 }
@@ -257,11 +260,11 @@ func uniqueSessionName(base string) string {
 func atomicWrite(path string, payload []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
+		return fmt.Errorf("creando directorio %q: %w", dir, err)
 	}
 	temp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
-		return err
+		return fmt.Errorf("creando temporal en %q: %w", dir, err)
 	}
 	tempName := temp.Name()
 	cleanup := func() {
@@ -270,23 +273,23 @@ func atomicWrite(path string, payload []byte) error {
 	}
 	if _, err := temp.Write(payload); err != nil {
 		cleanup()
-		return err
+		return fmt.Errorf("escribiendo temporal: %w", err)
 	}
 	if err := temp.Sync(); err != nil {
 		cleanup()
-		return err
+		return fmt.Errorf("sincronizando temporal: %w", err)
 	}
 	if err := temp.Close(); err != nil {
 		_ = os.Remove(tempName)
-		return err
+		return fmt.Errorf("cerrando temporal: %w", err)
 	}
 	if err := os.Chmod(tempName, 0o600); err != nil {
 		_ = os.Remove(tempName)
-		return err
+		return fmt.Errorf("ajustando permisos de %q: %w", tempName, err)
 	}
 	if err := os.Rename(tempName, path); err != nil {
 		_ = os.Remove(tempName)
-		return err
+		return fmt.Errorf("renombrando temporal a %q: %w", path, err)
 	}
 	return nil
 }

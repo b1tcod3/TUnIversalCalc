@@ -283,6 +283,27 @@ func TestSimplifyPublicAPI(t *testing.T) {
 	}
 }
 
+func TestMergeMulBasesNumInvalido(t *testing.T) {
+	coeff, rest := mergeMulBases([]Expr{Num{Text: "no-num"}, Num{Text: "2"}})
+	if coeff != 2 {
+		t.Fatalf("coeficiente = %v, se esperaba 2", coeff)
+	}
+	if len(rest) != 1 || rest[0].Ascii() != "no-num" {
+		t.Fatalf("el Num inválido debe conservarse como factor: %v", rest)
+	}
+}
+
+func TestLHopitalSinDerivada(t *testing.T) {
+	e := Call{Name: "tan", Arg: Var{Name: 'x'}}
+	got := lHopital(e, 'x')
+	if got == nil {
+		t.Fatal("lHopital no debe devolver nil si la derivada falla")
+	}
+	if got.Ascii() != e.Ascii() {
+		t.Fatalf("lHopital(%q) = %q, se esperaba conservar la expresión", e.Ascii(), got.Ascii())
+	}
+}
+
 func TestLimitUnsupported(t *testing.T) {
 	if _, _, err := Limit(mustParse(t, "sin(x)/x"), 'x', Value{IsInf: true, Sign: 1}); err == nil {
 		t.Fatal("sin(x)/x en ∞ debe dar error (no polinómico)")

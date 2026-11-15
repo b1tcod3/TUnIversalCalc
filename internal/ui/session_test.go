@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -181,6 +182,77 @@ func TestOpenSessionNombreInvalido(t *testing.T) {
 	m := newFlowModel()
 	if err := m.OpenSession("   "); err == nil {
 		t.Fatal("un nombre vacío debe devolver error")
+	}
+}
+
+func TestErroresDeSesionEnvuelven(t *testing.T) {
+	withTempSessions(t)
+
+	_, err := LoadSession("no-existe")
+	if err == nil || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("LoadSession debe envolver ErrNotExist: %v", err)
+	}
+	if !strings.Contains(err.Error(), "leyendo sesión") {
+		t.Fatalf("falta contexto en LoadSession: %v", err)
+	}
+
+	if err := DeleteSession("no-existe"); err == nil || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("DeleteSession debe envolver ErrNotExist: %v", err)
+	}
+
+	if _, err := DuplicateSession("no-existe"); err == nil || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("DuplicateSession debe envolver ErrNotExist: %v", err)
+	}
+}
+
+func TestSaveSessionErrorEnvuelve(t *testing.T) {
+	base := t.TempDir()
+	blocker := filepath.Join(base, "bloqueo")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_HOME", blocker)
+
+	err := SaveSession("trabajo", SessionData{})
+	if err == nil {
+		t.Fatal("SaveSession debía fallar con un directorio inválido")
+	}
+	if !strings.Contains(err.Error(), "guardando sesión") {
+		t.Fatalf("falta contexto en SaveSession: %v", err)
+	}
+}
+
+// TestGuardadoSeRegistraUnaVez protege la regla de manejo único: el comando
+// devuelve el error y solo el Update lo registra en el log.
+func TestGuardadoSeRegistraUnaVez(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	m := newFlowModel()
+	if err := m.OpenSession("trabajo"); err != nil {
+		t.Fatalf("OpenSession: %v", err)
+	}
+
+	blocker := filepath.Join(data, "bloqueo")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_HOME", blocker)
+
+	cmd := m.manualSave()
+	if cmd == nil {
+		t.Fatal("manualSave debe devolver un comando")
+	}
+	msg, ok := cmd().(sessionSavedMsg)
+	if !ok || msg.err == nil {
+		t.Fatalf("se esperaba un sessionSavedMsg con error: %+v", msg)
+	}
+	if strings.Contains(m.plainOutput(), "No se pudo guardar") {
+		t.Fatal("el error no debe registrarse antes de que Update lo maneje")
+	}
+
+	m.Update(msg)
+	if got := strings.Count(m.plainOutput(), "No se pudo guardar"); got != 1 {
+		t.Fatalf("el error se registró %d veces, se esperaba 1", got)
 	}
 }
 
