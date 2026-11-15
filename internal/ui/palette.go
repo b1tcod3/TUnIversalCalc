@@ -166,10 +166,7 @@ func (m *Model) paletteView() string {
 	innerW := m.leftWidth() - chromeInW - chromeInW
 	var lines []string
 	from := m.palette.Off
-	to := from + m.palette.Max
-	if to > len(m.palette.List) {
-		to = len(m.palette.List)
-	}
+	to := min(from+m.palette.Max, len(m.palette.List))
 	for i := from; i < to; i++ {
 		t := m.palette.List[i]
 		line := clampWidth(t.Trigger+"  "+t.InsertText+"  — "+t.Desc, innerW)

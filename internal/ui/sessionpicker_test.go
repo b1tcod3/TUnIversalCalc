@@ -3,10 +3,9 @@ package ui
 import (
 	"strings"
 	"testing"
+	"tuniversalcalc/internal/engine"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"tuniversalcalc/internal/engine"
 )
 
 func seedSessions(t *testing.T) {

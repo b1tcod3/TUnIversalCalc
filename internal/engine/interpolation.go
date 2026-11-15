@@ -1,10 +1,11 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
-
 	"tuniversalcalc/internal/render"
 )
 
@@ -36,14 +37,14 @@ func Lagrange(points []Point) ([]string, error) {
 		base := make([]float64, 1)
 		base[0] = 1
 		var terms []string
-		for j := range points {
+		for j, pj := range points {
 			if j == i {
 				continue
 			}
-			den := points[i].X - points[j].X
-			base = polyMul(base, []float64{-points[j].X, 1})
+			den := p.X - pj.X
+			base = polyMul(base, []float64{-pj.X, 1})
 			terms = append(terms, fmt.Sprintf("(x − %s)/(%s − %s)",
-				formatNum(points[j].X), formatNum(points[i].X), formatNum(points[j].X)))
+				formatNum(pj.X), formatNum(p.X), formatNum(pj.X)))
 			// dividir cada coeficiente por el denominador
 			for k := range base {
 				base[k] /= den
@@ -81,9 +82,9 @@ func Newton(points []Point) ([]string, error) {
 		table[i][0] = points[i].Y
 	}
 	for j := 1; j < n; j++ {
-		for i := 0; i < n-j; i++ {
+		for i := range n - j {
 			table[i][j] = (table[i+1][j-1] - table[i][j-1]) /
-				(points[i+j].X - points[i].X)
+				(points[i+j].X - points[i].X) //nolint:gosec // i < n-j acota ambos índices
 		}
 	}
 
@@ -95,7 +96,7 @@ func Newton(points []Point) ([]string, error) {
 	// Forma anidada: P(x) = cc[0] + cc[1] + ...  donde cada cc[k] multiplica
 	// (x-x0)(x-x1)...(x-x_{k-1}). Construimos acumulando con Horner.
 	terms := make([]string, n)
-	for k := 0; k < n; k++ {
+	for k := range n {
 		label := fmt.Sprintf("f[x0..x%d]", k)
 		if k == 0 {
 			label = "f[x0]"
@@ -106,13 +107,13 @@ func Newton(points []Point) ([]string, error) {
 
 	// Polinomio en forma de Newton (base nodal).
 	var nb strings.Builder
-	for k := 0; k < n; k++ {
+	for k := range n {
 		if k > 0 {
 			nb.WriteString(" + ")
 		}
 		nb.WriteString(formatNum(table[0][k]))
-		for j := 0; j < k; j++ {
-			nb.WriteString("(x − " + formatNum(points[j].X) + ")")
+		for _, pj := range points[:k] {
+			nb.WriteString("(x − " + formatNum(pj.X) + ")")
 		}
 	}
 	steps = append(steps, "Forma de Newton: P(x) = "+nb.String())
@@ -121,11 +122,11 @@ func Newton(points []Point) ([]string, error) {
 	expanded := make([]float64, 1)
 	expanded[0] = 0
 	acc := []float64{1} // acumula (x-x0)(x-x1)...(x-x_{k-1})
-	for k := 0; k < n; k++ {
+	for k, pk := range points {
 		term := polyScale(acc, table[0][k])
 		expanded = polyAdd(expanded, term)
 		if k < n-1 {
-			acc = polyMul(acc, []float64{-points[k].X, 1})
+			acc = polyMul(acc, []float64{-pk.X, 1})
 		}
 	}
 	steps = append(steps, "Polinomio (expandido): P(x) = "+formatPoly(expanded))
@@ -136,7 +137,7 @@ func Newton(points []Point) ([]string, error) {
 // crecientes o al menos todas distintas en valor.
 func validatePoints(pts []Point) error {
 	if len(pts) < 2 {
-		return fmt.Errorf("se necesitan al menos 2 puntos para interpolar")
+		return errors.New("se necesitan al menos 2 puntos para interpolar")
 	}
 	seen := map[float64]bool{}
 	for _, p := range pts {
@@ -168,7 +169,7 @@ func formatDDTable(points []Point, table [][]float64) string {
 	var b strings.Builder
 	b.WriteString("Tabla de diferencias divididas:")
 	b.WriteString("\n  " + padRow(cols))
-	for i := 0; i < n; i++ {
+	for i := range n {
 		row := []string{formatNum(points[i].X), formatNum(table[i][0])}
 		for j := 1; j <= i; j++ {
 			row = append(row, formatNum(table[i-j][j]))
@@ -213,10 +214,7 @@ func polyMul(a, b []float64) []float64 {
 
 // polyAdd suma dos polinomios (mantiene el mayor grado).
 func polyAdd(a, b []float64) []float64 {
-	n := len(a)
-	if len(b) > n {
-		n = len(b)
-	}
+	n := max(len(b), len(a))
 	res := make([]float64, n)
 	copy(res, a)
 	for i := range b {
@@ -242,8 +240,7 @@ func formatPoly(c []float64) string {
 		return "0"
 	}
 	var parts []string
-	for d := len(c) - 1; d >= 0; d-- {
-		v := c[d]
+	for d, v := range slices.Backward(c) {
 		if approxZero(v) {
 			continue
 		}

@@ -1,4 +1,4 @@
-.PHONY: all build run test test-race vet fmt clean
+.PHONY: all build run test test-race vet lint lint-fix fmt clean
 
 VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
 BIN ?= bin/tuniversalcalc
@@ -21,8 +21,14 @@ test-race:
 vet:
 	go vet ./...
 
+lint:
+	golangci-lint run ./...
+
+lint-fix:
+	golangci-lint run --fix ./...
+
 fmt:
-	gofmt -w $$(find . -name '*.go' -not -path './.git/*')
+	golangci-lint fmt ./...
 
 clean:
 	rm -rf bin coverage.out

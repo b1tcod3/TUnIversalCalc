@@ -2,7 +2,6 @@ package engine
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -308,9 +307,9 @@ func formatNum(f float64) string {
 			g := gcd(int64(n), int64(d))
 			n /= float64(g)
 			dd := d / float64(g)
-			s := fmt.Sprintf("%d", int64(n))
+			s := strconv.FormatInt(int64(n), 10)
 			if dd > 1 {
-				s += "/" + fmt.Sprintf("%d", int64(dd))
+				s += "/" + strconv.FormatInt(int64(dd), 10)
 			}
 			if neg {
 				return "-" + s

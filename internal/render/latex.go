@@ -98,7 +98,7 @@ func groupLatex(s string, start int) (string, int) {
 func spaceOperators(s string) string {
 	var b strings.Builder
 	var prev byte // último carácter significativo escrito
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		switch c {
 		case '+', '=':

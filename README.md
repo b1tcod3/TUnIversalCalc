@@ -37,6 +37,7 @@ Calculadora TUI (interfaz de texto) en **Go** con **Bubble Tea**, construida con
 ## Requisitos
 
 - Go 1.26 o superior
+- [golangci-lint](https://golangci-lint.run/) v2 o superior (solo para `make lint`, `make lint-fix` y `make fmt`)
 
 ## Instalación
 
@@ -125,6 +126,18 @@ La factorización también se ejecuta sola al declarar una expresión que sea un
 /expresion 120
 120
 → 120 = 2³ · 3 · 5
+```
+
+## Calidad
+
+La configuración de `golangci-lint` vive en `.golangci.yml` y cubre corrección,
+estilo, complejidad, seguridad y modernización del código. El CI la ejecuta en
+cada push y pull request.
+
+```bash
+make lint      # analiza todo el proyecto
+make lint-fix  # aplica las correcciones automáticas
+make fmt       # aplica gofumpt y goimports
 ```
 
 ## Estructura del proyecto

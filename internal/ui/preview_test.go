@@ -62,13 +62,13 @@ func TestPreviewSeLimpiaAlEjecutar(t *testing.T) {
 func TestPreviewErrorSeMuestra(t *testing.T) {
 	m := newFlowModel()
 	declararPuntos(t, &m)
-	m.preview.err = errTest("no soportado")
+	m.preview.err = testError("no soportado")
 	view := m.View()
 	if !strings.Contains(view, "no soportado") {
 		t.Fatal("el error de preview debe aparecer en la vista")
 	}
 }
 
-type errTest string
+type testError string
 
-func (e errTest) Error() string { return string(e) }
+func (e testError) Error() string { return string(e) }

@@ -40,7 +40,7 @@ func TestUndoComandoNoRestauraResultado(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("se esperaba comando")
 	}
-	m.applyResult(cmd().(ResultMsg))
+	m.applyResult(mustResultMsg(t, cmd))
 	if len(m.history) != 1 {
 		t.Fatalf("historial = %v", m.history)
 	}
@@ -61,7 +61,7 @@ func TestUndoComandoNoRestauraResultado(t *testing.T) {
 
 func TestUndoLimite(t *testing.T) {
 	m := newFlowModel()
-	for i := 0; i < maxUndoLevels+10; i++ {
+	for range maxUndoLevels + 10 {
 		m.pushUndo()
 	}
 	if len(m.undoStack) != maxUndoLevels {

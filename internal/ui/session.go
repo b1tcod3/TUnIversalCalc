@@ -2,17 +2,18 @@ package ui
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"tuniversalcalc/internal/engine"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"tuniversalcalc/internal/engine"
 )
 
 const (
@@ -170,7 +171,7 @@ func LoadSession(name string) (SessionData, error) {
 // SaveSession escribe la sesión de forma atómica (temporal + rename).
 func SaveSession(name string, data SessionData) error {
 	if name == "" {
-		return fmt.Errorf("nombre de sesión vacío")
+		return errors.New("nombre de sesión vacío")
 	}
 	if data.Version == 0 {
 		data.Version = sessionVersion
@@ -206,7 +207,7 @@ func RenameSession(oldName, newName string) error {
 	oldName = sanitizeSessionName(oldName)
 	newName = sanitizeSessionName(newName)
 	if oldName == "" || newName == "" {
-		return fmt.Errorf("nombre de sesión vacío o inválido")
+		return errors.New("nombre de sesión vacío o inválido")
 	}
 	if oldName == newName {
 		return nil
@@ -255,7 +256,7 @@ func uniqueSessionName(base string) string {
 
 func atomicWrite(path string, payload []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	temp, err := os.CreateTemp(dir, ".tmp-*")
@@ -264,8 +265,8 @@ func atomicWrite(path string, payload []byte) error {
 	}
 	tempName := temp.Name()
 	cleanup := func() {
-		temp.Close()
-		os.Remove(tempName)
+		_ = temp.Close()
+		_ = os.Remove(tempName)
 	}
 	if _, err := temp.Write(payload); err != nil {
 		cleanup()
@@ -276,15 +277,15 @@ func atomicWrite(path string, payload []byte) error {
 		return err
 	}
 	if err := temp.Close(); err != nil {
-		os.Remove(tempName)
+		_ = os.Remove(tempName)
 		return err
 	}
-	if err := os.Chmod(tempName, 0o644); err != nil {
-		os.Remove(tempName)
+	if err := os.Chmod(tempName, 0o600); err != nil {
+		_ = os.Remove(tempName)
 		return err
 	}
 	if err := os.Rename(tempName, path); err != nil {
-		os.Remove(tempName)
+		_ = os.Remove(tempName)
 		return err
 	}
 	return nil
@@ -373,9 +374,7 @@ func (m *Model) sessionData() SessionData {
 		}
 		data.Objects[name] = cp
 	}
-	for t, n := range m.counters {
-		data.Counters[t] = n
-	}
+	maps.Copy(data.Counters, m.counters)
 	return data
 }
 
@@ -430,7 +429,7 @@ func (m *Model) applySession(name string, data SessionData) {
 func (m *Model) OpenSession(name string) error {
 	clean := sanitizeSessionName(name)
 	if clean == "" {
-		return fmt.Errorf("nombre de sesión vacío o inválido")
+		return errors.New("nombre de sesión vacío o inválido")
 	}
 	m.sessionName = clean
 	m.sessionEnabled = true

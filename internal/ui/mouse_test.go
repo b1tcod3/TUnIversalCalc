@@ -57,7 +57,7 @@ func TestMouseClickPanel2Bloqueado(t *testing.T) {
 
 func TestMouseWheelScrollSalida(t *testing.T) {
 	m := newFlowModel()
-	for i := 0; i < 40; i++ {
+	for range 40 {
 		m.addLog(LevelInfo, strings.Repeat("linea ", 5))
 	}
 	m.output.GotoTop()

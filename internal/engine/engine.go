@@ -7,18 +7,16 @@ import (
 )
 
 // Evaluate es la interfaz asíncrona del motor: recibe el objeto declarado
-// (sobre el que ya resolvió la UI), el comando del panel 2 y la variable,
-// y devuelve los pasos del cálculo para el panel de salida.
+// (sobre el que ya resolvió la UI) y el comando del panel 2, y devuelve los
+// pasos del cálculo para el panel de salida. El tercer argumento se conserva
+// por compatibilidad con la UI, que hoy lo resuelve pero no lo necesita.
 //
 // El motor combina un parser simbólico (para funciones/expresiones) con
 // operaciones de cálculo numérico (interpolación polinómica). Los métodos
 // de interpolación trabajan sobre puntos declarados con /puntos.
-func Evaluate(decl Decl, cmd, varName string) ([]string, error) {
+func Evaluate(decl Decl, cmd, _ string) ([]string, error) {
 	if decl.Nombre == "" {
 		return nil, errors.New("objeto vacío: declara uno en el panel 1 (/puntos (1,2) (3,4))")
-	}
-	if varName == "" {
-		varName = "x"
 	}
 
 	op := normalizeOp(cmd)
@@ -71,7 +69,7 @@ func evalOp(decl Decl, op string) ([]string, error) {
 // evalLagrange exige un objeto de puntos y delega en el algoritmo.
 func evalLagrange(decl Decl) ([]string, error) {
 	if decl.Tipo != DeclPuntos {
-		return nil, fmt.Errorf("lagrange opera sobre puntos: declara /puntos (x,y) (x,y) ...")
+		return nil, errors.New("lagrange opera sobre puntos: declara /puntos (x,y) (x,y)")
 	}
 	return Lagrange(decl.Points)
 }
@@ -79,7 +77,7 @@ func evalLagrange(decl Decl) ([]string, error) {
 // evalNewton exige un objeto de puntos y delega en el algoritmo.
 func evalNewton(decl Decl) ([]string, error) {
 	if decl.Tipo != DeclPuntos {
-		return nil, fmt.Errorf("newton opera sobre puntos: declara /puntos (x,y) (x,y) ...")
+		return nil, errors.New("newton opera sobre puntos: declara /puntos (x,y) (x,y)")
 	}
 	return Newton(decl.Points)
 }

@@ -1,0 +1,112 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  # Los cinco linters estándar (errcheck, govet, ineffassign, staticcheck,
+  # unused) ya vienen activos; aquí se añaden los que aportan valor a una TUI
+  # con motor numérico y sin servidor HTTP, SQL ni logging estructurado.
+  #
+  # misspell no se activa: los comentarios y mensajes están en español y su
+  # diccionario inglés marca palabras correctas como "comando" o "factores".
+  default: standard
+  enable:
+    # correctness
+    - copyloopvar
+    - durationcheck
+    - errname
+    - errorlint
+    - forcetypeassert
+    - nilerr
+    - reassign
+    - wastedassign
+    # style
+    - asciicheck
+    - dupword
+    - gocritic
+    - predeclared
+    - revive
+    - whitespace
+    # complexity
+    - dupl
+    - funlen
+    - gocyclo
+    - nestif
+    # performance
+    - goconst
+    - perfsprint
+    - unconvert
+    # security
+    - bidichk
+    - gosec
+    # modernization
+    - exptostd
+    - intrange
+    - modernize
+    - usestdlibvars
+    # testing
+    - thelper
+    - usetesting
+    # meta
+    - nolintlint
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+    dupl:
+      threshold: 150
+    funlen:
+      lines: 120
+      statements: 80
+    goconst:
+      min-len: 3
+      min-occurrences: 4
+      ignore-tests: true
+    gocyclo:
+      min-complexity: 15
+    nestif:
+      min-complexity: 5
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        # El proyecto documenta en español y no exige comentario en cada
+        # símbolo exportado; se prioriza claridad sobre ceremonia.
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+        - name: unused-receiver
+          disabled: true
+
+  exclusions:
+    # Los tests suelen ser largos y con muchos casos; las métricas de
+    # complejidad y duplicación están pensadas para el código de producción.
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl
+          - funlen
+          - gocyclo
+          - nestif
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra:
+        group-params: true
+        clothe-returns: true
+  exclusions:
+    generated: lax

@@ -3,10 +3,9 @@ package ui
 import (
 	"strings"
 	"time"
+	"tuniversalcalc/internal/engine"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"tuniversalcalc/internal/engine"
 )
 
 // previewDelay es el debounce de la evaluación en vivo del panel 2.
@@ -93,36 +92,12 @@ func (m *Model) clearPreview() {
 // previewTarget es como resolveTarget pero sin escribir en el log: se usa
 // mientras el usuario escribe y todavía puede haber un comando incompleto.
 func (m *Model) previewTarget(cmd string) (engine.Decl, string, bool) {
-	norm := normalizeCommandArgs(cmd)
-	toks := splitCommandTokens(norm)
-	if len(toks) == 0 {
-		return engine.Decl{}, "", false
-	}
+	toks := splitCommandTokens(normalizeCommandArgs(cmd))
 	if d, ok := m.literalIntegerDecl(cmd); ok {
 		return d, "x", true
 	}
-	objName, varName := "", "x"
-	if len(toks) >= 2 {
-		name := toks[1]
-		if _, ok := m.objs[name]; ok {
-			objName = name
-			if len(toks) >= 3 {
-				varName = toks[2]
-			}
-		} else if len(name) == 1 {
-			varName = name
-		} else {
-			return engine.Decl{}, "", false
-		}
-	}
-	if objName == "" {
-		objName = m.lastObj
-	}
-	if objName == "" {
-		return engine.Decl{}, "", false
-	}
-	decl, ok := m.objs[objName]
-	if !ok {
+	decl, varName, err := m.resolveTargetTokens(toks)
+	if err != nil {
 		return engine.Decl{}, "", false
 	}
 	return decl, varName, true
@@ -130,10 +105,7 @@ func (m *Model) previewTarget(cmd string) (engine.Decl, string, bool) {
 
 // previewView renderiza la última línea del resultado en vivo.
 func (m *Model) previewView() string {
-	w := m.leftWidth() - chromeInW - 4
-	if w < 10 {
-		w = 10
-	}
+	w := max(m.leftWidth()-chromeInW-4, 10)
 	if m.preview.err != nil {
 		return levelErrorStyle.Render(clampWidth("✗ "+m.preview.err.Error(), w))
 	}

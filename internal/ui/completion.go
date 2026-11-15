@@ -89,10 +89,7 @@ func (m *Model) openCompletions() {
 	ti := m.focusedInput()
 	val := ti.Value()
 	runes := []rune(val)
-	cursor := ti.Position()
-	if cursor > len(runes) {
-		cursor = len(runes)
-	}
+	cursor := min(ti.Position(), len(runes))
 	if strings.HasPrefix(val, "/") && !strings.Contains(string(runes[:cursor]), " ") {
 		m.refreshPalette()
 		return
@@ -263,14 +260,8 @@ func (m *Model) completionView() string {
 		return ""
 	}
 	innerW := m.leftWidth() - chromeInW - chromeInW
-	from := c.Off
-	if from < 0 {
-		from = 0
-	}
-	to := from + c.Max
-	if to > len(c.Items) {
-		to = len(c.Items)
-	}
+	from := max(c.Off, 0)
+	to := min(from+c.Max, len(c.Items))
 	var lines []string
 	for i := from; i < to; i++ {
 		item := c.Items[i]

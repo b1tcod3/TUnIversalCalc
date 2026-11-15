@@ -1,12 +1,12 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"math/bits"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
-
 	"tuniversalcalc/internal/render"
 )
 
@@ -78,7 +78,7 @@ func absInt64(n int64) uint64 {
 	}
 	// -(n+1) es seguro incluso para MinInt64; sumar 1 después evita el
 	// overflow de -MinInt64.
-	return uint64(-(n + 1)) + 1
+	return uint64(-(n + 1)) + 1 //nolint:gosec // n < 0 garantiza que -(n+1) no es negativo
 }
 
 // Factorize descompone n en factores primos. Para 0 y ±1 devuelve una
@@ -135,7 +135,7 @@ func factorizeUint64(n uint64) []uint64 {
 	if n > 1 {
 		factorRec(n, &out)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	slices.Sort(out)
 	return out
 }
 
@@ -332,7 +332,7 @@ func FormatExpanded(f Factorization) string {
 // salida.
 func evalFactorizar(decl Decl) ([]string, error) {
 	if decl.Tipo != DeclExpresion {
-		return nil, fmt.Errorf("factorizar opera sobre una expresión entera: usa /expresion 120")
+		return nil, errors.New("factorizar opera sobre una expresión entera: usa /expresion 120")
 	}
 	n, ok := decl.IntegerValue()
 	if !ok {
@@ -362,7 +362,7 @@ func evalFactorizar(decl Decl) ([]string, error) {
 		cur := mag
 		for _, g := range f.Groups {
 			values := []string{strconv.FormatUint(cur, 10)}
-			for i := 0; i < g.Exp; i++ {
+			for range g.Exp {
 				cur /= g.Prime
 				values = append(values, strconv.FormatUint(cur, 10))
 			}

@@ -1,9 +1,9 @@
 package ui
 
 import (
-	tea "github.com/charmbracelet/bubbletea"
-
 	"tuniversalcalc/internal/engine"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ResultMsg transporta el resultado del motor al bucle principal. ReqID

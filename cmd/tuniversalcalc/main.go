@@ -4,10 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"tuniversalcalc/internal/ui"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"tuniversalcalc/internal/ui"
 )
 
 var version = "dev" // se fija con -ldflags "-X main.version=..."

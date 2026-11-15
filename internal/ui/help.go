@@ -28,14 +28,8 @@ func (m *Model) toggleHelp() {
 
 // layoutHelp ajusta el viewport de ayuda al tamaño actual de la terminal.
 func (m *Model) layoutHelp() {
-	w := m.width - 6
-	if w < 20 {
-		w = 20
-	}
-	h := m.height - 8
-	if h < 3 {
-		h = 3
-	}
+	w := max(m.width-6, 20)
+	h := max(m.height-8, 3)
 	m.helpViewport.Width = w
 	m.helpViewport.Height = h
 }
@@ -49,24 +43,24 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 		m.helpOpen = false
 		return nil, true
 	case tea.KeyUp:
-		m.helpViewport.LineUp(1)
+		m.helpViewport.ScrollUp(1)
 		return nil, true
 	case tea.KeyDown:
-		m.helpViewport.LineDown(1)
+		m.helpViewport.ScrollDown(1)
 		return nil, true
 	case tea.KeyPgUp:
-		m.helpViewport.HalfViewUp()
+		m.helpViewport.HalfPageUp()
 		return nil, true
 	case tea.KeyPgDown:
-		m.helpViewport.HalfViewDown()
+		m.helpViewport.HalfPageDown()
 		return nil, true
 	}
 	switch msg.String() {
 	case "j":
-		m.helpViewport.LineDown(1)
+		m.helpViewport.ScrollDown(1)
 		return nil, true
 	case "k":
-		m.helpViewport.LineUp(1)
+		m.helpViewport.ScrollUp(1)
 		return nil, true
 	case "q":
 		m.helpOpen = false

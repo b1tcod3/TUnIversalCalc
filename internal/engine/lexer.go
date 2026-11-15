@@ -27,9 +27,17 @@ type Token struct {
 	Pos  int
 }
 
+// nombres de las funciones reconocidas por el léxico y por el motor simbólico.
+const (
+	fnSqrt = "sqrt"
+	fnSin  = "sin"
+	fnCos  = "cos"
+	fnAbs  = "abs"
+)
+
 // funciones y constantes reconocidas (todas en minúsculas).
 var funcs = map[string]bool{
-	"sqrt": true, "sin": true, "cos": true, "abs": true,
+	fnSqrt: true, fnSin: true, fnCos: true, fnAbs: true,
 }
 
 var consts = map[string]bool{

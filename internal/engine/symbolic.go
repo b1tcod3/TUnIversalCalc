@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 )
 
 // --- recolección de términos: coeff × resto (producto no numérico) ---
@@ -216,9 +217,9 @@ func simplifyDiv(n Div) Expr {
 	if df, ok := matchNum(den); ok && df == 1 {
 		return num
 	}
-	if _, neg := den.(Neg); neg {
+	if neg, ok := den.(Neg); ok {
 		// el signo va arriba: a/(-b) → -(a/b)
-		return Neg{X: simplifyNormaliza(Div{Num: num, Den: den.(Neg).X})}
+		return Neg{X: simplifyNormaliza(Div{Num: num, Den: neg.X})}
 	}
 	return Div{Num: num, Den: den}
 }
@@ -265,13 +266,13 @@ func simplifyMulForzado(n Mul) Expr {
 	if len(rest) == 0 {
 		return Num{Text: NumFromFloat(coeff).Text}
 	}
-	switch {
-	case coeff == 1:
+	switch coeff {
+	case 1:
 		if len(rest) == 1 {
 			return rest[0]
 		}
 		return Mul{Factors: rest}
-	case coeff == -1:
+	case -1:
 		if len(rest) == 1 {
 			return Neg{X: rest[0]}
 		}
@@ -334,10 +335,10 @@ func mergeMulBases(facts []Expr) (float64, []Expr) {
 	for _, k := range order {
 		e := baseExp[k]
 		base := rests[k]
-		switch {
-		case e == 1:
+		switch e {
+		case 1:
 			rest = append(rest, base)
-		case e == 0:
+		case 0:
 			// se cancela
 		default:
 			rest = append(rest, Pow{Base: base, Exp: Num{Text: FormatFloatText(e)}})
@@ -493,12 +494,12 @@ func (d *deriver) deriveCall(n Call) (Expr, error) {
 	d.rule("regla de la cadena sobre " + n.Ascii())
 	var out Expr
 	switch n.Name {
-	case "sqrt":
-		out = Div{Num: du, Den: Mul{Factors: []Expr{Num{Text: "2"}, Call{Name: "sqrt", Arg: n.Arg}}}}
-	case "sin":
-		out = Mul{Factors: []Expr{Call{Name: "cos", Arg: n.Arg}, du}}
-	case "cos":
-		out = Neg{X: Mul{Factors: []Expr{Call{Name: "sin", Arg: n.Arg}, du}}}
+	case fnSqrt:
+		out = Div{Num: du, Den: Mul{Factors: []Expr{Num{Text: "2"}, Call{Name: fnSqrt, Arg: n.Arg}}}}
+	case fnSin:
+		out = Mul{Factors: []Expr{Call{Name: fnCos, Arg: n.Arg}, du}}
+	case fnCos:
+		out = Neg{X: Mul{Factors: []Expr{Call{Name: fnSin, Arg: n.Arg}, du}}}
 	case "abs":
 		// |u|' = u·u' / |u|
 		out = Div{Num: Mul{Factors: []Expr{n.Arg, du}}, Den: n}
@@ -678,11 +679,13 @@ func Integrate(e Expr, v byte) (Expr, []string, error) {
 	e = simplifyNormaliza(e)
 	vars := varList(e)
 	other := ""
+	var otherSb strings.Builder
 	for _, vv := range vars {
 		if vv != v {
-			other += string(vv)
+			otherSb.WriteString(string(vv))
 		}
 	}
+	other += otherSb.String()
 	if other != "" {
 		return nil, nil, fmt.Errorf("integral con otras variables (%s): no soportada aún", other)
 	}
@@ -772,7 +775,7 @@ func integratePow(t symTerm, n Pow, v byte) (symTerm, bool) {
 		// ∫√v = (2/3)·v·√v
 		return symTerm{
 			coeff: t.coeff * 2 / 3,
-			rest:  Mul{Factors: []Expr{Var{Name: v}, Call{Name: "sqrt", Arg: Var{Name: v}}}},
+			rest:  Mul{Factors: []Expr{Var{Name: v}, Call{Name: fnSqrt, Arg: Var{Name: v}}}},
 		}, true
 	}
 	// ∫ vᵉ dv = v^(e+1)/(e+1)
@@ -789,12 +792,12 @@ func integrateCall(c float64, n Call, v byte) (symTerm, bool) {
 		return symTerm{}, false
 	}
 	switch n.Name {
-	case "sin":
+	case fnSin:
 		// ∫ sin(v) dv = −cos(v)
-		return symTerm{coeff: -c, rest: Call{Name: "cos", Arg: Var{Name: v}}}, true
-	case "cos":
+		return symTerm{coeff: -c, rest: Call{Name: fnCos, Arg: Var{Name: v}}}, true
+	case fnCos:
 		// ∫ cos(v) dv = sin(v)
-		return symTerm{coeff: c, rest: Call{Name: "sin", Arg: Var{Name: v}}}, true
+		return symTerm{coeff: c, rest: Call{Name: fnSin, Arg: Var{Name: v}}}, true
 	}
 	return symTerm{}, false
 }
@@ -815,7 +818,7 @@ func Limit(e Expr, v byte, a Value) (Expr, []string, error) {
 	}
 
 	f := e
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		res, err := numEval(f, v, a.Val)
 		if err != nil {
 			return nil, nil, err
@@ -825,23 +828,27 @@ func Limit(e Expr, v byte, a Value) (Expr, []string, error) {
 		}
 		if i < 2 {
 			steps = append(steps, "Forma indeterminada → aplicando L'Hôpital...")
-			if d, ok := f.(Div); ok {
-				// lim f/g = lim f'/g': se deriva cada lado por separado,
-				// más fiable que la regla del cociente completa.
-				dn, _, errn := Derive(d.Num, v)
-				if errn == nil {
-					dd, _, errd := Derive(d.Den, v)
-					if errd == nil {
-						f = Div{Num: simplifyNormaliza(dn), Den: simplifyNormaliza(dd)}
-						continue
-					}
-				}
-			}
-			f2, _, _ := Derive(f, v)
-			f = simplifyNormaliza(f2)
+			f = lHopital(f, v)
 		}
 	}
 	return nil, nil, errors.New("límite indeterminado (0/0 o ∞/∞) que no se resuelve con dos derivadas: sin soportar aún")
+}
+
+// lHopital aplica un paso de la regla de L'Hôpital: si f es un cociente
+// deriva numerador y denominador por separado (más fiable que la regla del
+// cociente completa); en cualquier otro caso deriva la expresión entera.
+func lHopital(f Expr, v byte) Expr {
+	if d, ok := f.(Div); ok {
+		dn, _, errn := Derive(d.Num, v)
+		if errn == nil {
+			dd, _, errd := Derive(d.Den, v)
+			if errd == nil {
+				return Div{Num: simplifyNormaliza(dn), Den: simplifyNormaliza(dd)}
+			}
+		}
+	}
+	f2, _, _ := Derive(f, v)
+	return simplifyNormaliza(f2)
 }
 
 // Value es el punto donde se evalúa el límite.
@@ -957,8 +964,8 @@ func asyDegreePow(n Pow, v byte) (float64, int, bool) {
 		}
 	}
 	if _, ok := n.Base.(Num); ok {
-		if f, err := numEval(n.Base, v, 0); err == nil {
-			return math.Pow(f, 0), 0, true
+		if _, err := numEval(n.Base, v, 0); err == nil {
+			return 1.0, 0, true
 		}
 	}
 	return 0, 0, false
@@ -1050,11 +1057,11 @@ func numEvalCall(n Call, v byte, a float64) (float64, error) {
 		return 0, err
 	}
 	switch n.Name {
-	case "sqrt":
+	case fnSqrt:
 		return math.Sqrt(x), nil
-	case "sin":
+	case fnSin:
 		return math.Sin(x), nil
-	case "cos":
+	case fnCos:
 		return math.Cos(x), nil
 	case "abs":
 		return math.Abs(x), nil

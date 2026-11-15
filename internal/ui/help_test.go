@@ -35,7 +35,7 @@ func TestHelpScroll(t *testing.T) {
 	m := newFlowModel()
 	m.toggleHelp()
 	before := m.helpViewport.YOffset
-	m.helpViewport.LineDown(5)
+	m.helpViewport.ScrollDown(5)
 	if m.helpViewport.YOffset <= before {
 		t.Fatal("la ayuda debe poder desplazarse")
 	}

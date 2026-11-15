@@ -313,14 +313,8 @@ func (m *Model) pickerView() string {
 		m.height = 12
 	}
 
-	width := m.width - 4
-	if width < 24 {
-		width = 24
-	}
-	m.picker.nameInput.Width = width - 18
-	if m.picker.nameInput.Width < 10 {
-		m.picker.nameInput.Width = 10
-	}
+	width := max(m.width-4, 24)
+	m.picker.nameInput.Width = max(width-18, 10)
 
 	title := helpTitleStyle.Render("Sesiones")
 	header := m.picker.query.View()
@@ -334,21 +328,12 @@ func (m *Model) pickerView() string {
 	}
 
 	list := m.picker.filtered()
-	maxRows := m.height - 10
-	if maxRows < 2 {
-		maxRows = 2
-	}
-	start := m.picker.sel - maxRows/2
-	if start < 0 {
-		start = 0
-	}
+	maxRows := max(m.height-10, 2)
+	start := max(m.picker.sel-maxRows/2, 0)
 	end := start + maxRows
 	if end > len(list) {
 		end = len(list)
-		start = end - maxRows
-		if start < 0 {
-			start = 0
-		}
+		start = max(end-maxRows, 0)
 	}
 
 	var rows []string

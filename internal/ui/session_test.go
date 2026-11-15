@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 	"tuniversalcalc/internal/engine"
 )
 
@@ -41,7 +40,7 @@ func TestSessionRoundtrip(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("la operación debe producir un comando")
 	}
-	m.applyResult(cmd().(ResultMsg))
+	m.applyResult(mustResultMsg(t, cmd))
 
 	if err := SaveSession("trabajo", m.sessionData()); err != nil {
 		t.Fatalf("SaveSession: %v", err)
@@ -113,10 +112,10 @@ func TestSessionListAndLast(t *testing.T) {
 
 func TestSessionCorrupta(t *testing.T) {
 	withTempSessions(t)
-	if err := os.MkdirAll(sessionsDir(), 0o755); err != nil {
+	if err := os.MkdirAll(sessionsDir(), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(sessionsDir(), "rota.json"), []byte("{no-json"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(sessionsDir(), "rota.json"), []byte("{no-json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadSession("rota"); err == nil {

@@ -1,18 +1,17 @@
 package ui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"tuniversalcalc/internal/engine"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-
-	"tuniversalcalc/internal/engine"
 )
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // despachador central de mensajes del bucle Elm
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -121,7 +120,7 @@ func (m *Model) applyResult(res ResultMsg) {
 
 // handleKey procesa una tecla. El segundo valor indica si el mensaje quedó
 // manejado; si no, cae al input enfocado.
-func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) { //nolint:gocyclo // un case por atajo de teclado, sin lógica anidada
 	// El selector de sesiones es modal y tiene prioridad.
 	if m.picker.open {
 		return m.handleSessionPickerKey(msg)
@@ -143,7 +142,6 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	}
 
 	switch msg.Type {
-
 	case tea.KeyCtrlC, tea.KeyEsc:
 		return m.quit(), true
 
@@ -348,35 +346,63 @@ func (m *Model) handleEnter() tea.Cmd {
 //   - /newton g1      → error si "g1" no es un objeto declarado
 func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
 	toks := splitCommandTokens(normalizeCommandArgs(cmd))
-	if len(toks) == 0 {
-		return engine.Decl{}, "", false
-	}
 	if d, ok := m.literalIntegerDecl(cmd); ok {
 		return d, "x", true
 	}
-	objName, varName := "", "x"
-	if len(toks) >= 2 {
-		name := toks[1]
-		if _, ok := m.objs[name]; ok {
-			objName = name
-			if len(toks) >= 3 {
-				varName = toks[2]
-			}
-		} else if len(name) == 1 {
-			varName = name
-		} else {
-			m.addLog(LevelError, fmt.Sprintf("objeto %q no declarado — declarados: %s", name, m.objList()))
-			return engine.Decl{}, "", false
-		}
-	}
-	if objName == "" {
-		objName = m.lastObj
-	}
-	if objName == "" {
-		m.addLog(LevelError, "no hay objetos declarados: declara uno en el panel 1 (/puntos (1,2) (3,4))")
+	decl, varName, err := m.resolveTargetTokens(toks)
+	if err != nil {
+		m.addLog(LevelError, err.Error())
 		return engine.Decl{}, "", false
 	}
-	return m.objs[objName], varName, true
+	return decl, varName, true
+}
+
+// resolveTargetTokens resuelve objeto y variable a partir de los tokens de un
+// comando. Comparte la lógica entre la ejecución real y la previsualización.
+func (m *Model) resolveTargetTokens(toks []string) (engine.Decl, string, error) {
+	if len(toks) == 0 {
+		return engine.Decl{}, "", errors.New("comando vacío")
+	}
+	objName, varName, err := m.parseTargetName(toks)
+	if err != nil {
+		return engine.Decl{}, "", err
+	}
+	decl, ok := m.objs[objName]
+	if !ok {
+		return engine.Decl{}, "", fmt.Errorf("objeto %q no declarado — declarados: %s", objName, m.objList())
+	}
+	return decl, varName, nil
+}
+
+// parseTargetName interpreta el objeto y la variable de los tokens del
+// comando, aplicando el último objeto declarado como valor por defecto.
+func (m *Model) parseTargetName(toks []string) (objName, varName string, err error) {
+	if len(toks) < 2 {
+		objName, err = m.defaultTargetName()
+		return objName, "x", err
+	}
+	name := toks[1]
+	if _, ok := m.objs[name]; ok {
+		varName = "x"
+		if len(toks) >= 3 {
+			varName = toks[2]
+		}
+		return name, varName, nil
+	}
+	if len(name) > 1 {
+		return "", "", fmt.Errorf("objeto %q no declarado — declarados: %s", name, m.objList())
+	}
+	objName, err = m.defaultTargetName()
+	return objName, name, err
+}
+
+// defaultTargetName devuelve el último objeto declarado o un error si aún no
+// hay ninguno.
+func (m *Model) defaultTargetName() (string, error) {
+	if m.lastObj == "" {
+		return "", errors.New("no hay objetos declarados: declara uno en el panel 1 (/puntos (1,2) (3,4))")
+	}
+	return m.lastObj, nil
 }
 
 // literalIntegerDecl permite usar /factorizar 120 sin declarar el número
@@ -517,14 +543,9 @@ func (m *Model) updateLayout() {
 	_, rh := m.leftHeight(), m.rightHeight()
 	contentW := lw - chromeInW - chromeInW // área interior de los paneles 1/2
 
-	m.declInput.Width = contentW - 3 // margen para el prompt "❯ "
-	if m.declInput.Width < 10 {
-		m.declInput.Width = 10
-	}
-	m.cmdInput.Width = contentW - 3 // margen para el prompt "❯ "
-	if m.cmdInput.Width < 10 {
-		m.cmdInput.Width = 10
-	}
+	// margen para el prompt "❯ "
+	m.declInput.Width = max(contentW-3, 10)
+	m.cmdInput.Width = max(contentW-3, 10)
 
 	// El viewport ocupa el contenido del panel 3 tras la cabecera
 	w := rw - chromeOutW - chromeOutW
@@ -540,31 +561,15 @@ func (m *Model) updateLayout() {
 
 	// Filas visibles de la paleta: contenido del panel menos título,
 	// blanco e input. 2..7 para que nunca desborde el layout.
-	m.palette.Max = m.leftHeight() - chromeInH - 4
-	if m.palette.Max < 2 {
-		m.palette.Max = 2
-	}
-	if m.palette.Max > 7 {
-		m.palette.Max = 7
-	}
-
-	m.completion.Max = m.leftHeight() - chromeInH - 4
-	if m.completion.Max < 2 {
-		m.completion.Max = 2
-	}
-	if m.completion.Max > 7 {
-		m.completion.Max = 7
-	}
+	m.palette.Max = min(max(m.leftHeight()-chromeInH-4, 2), 7)
+	m.completion.Max = min(max(m.leftHeight()-chromeInH-4, 2), 7)
 	if m.completion.Open {
 		m.clampCompletion()
 	}
 }
 
 func (m *Model) leftWidth() int {
-	w := m.width * 50 / 100
-	if w < 45 {
-		w = 45
-	}
+	w := max(m.width*50/100, 45)
 	return w
 }
 

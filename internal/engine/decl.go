@@ -1,10 +1,10 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-
 	"tuniversalcalc/internal/render"
 )
 
@@ -67,7 +67,7 @@ type Decl struct {
 func ParseDecl(raw string) (Decl, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
-		return Decl{}, fmt.Errorf("declaración vacía: usa /ecuacion, /funcion o /expresion")
+		return Decl{}, errors.New("declaración vacía: usa /ecuacion, /funcion o /expresion")
 	}
 	// Un entero literal suelto se considera una expresión: es la vía más
 	// directa para factorizar (120 → p1 = 120).
@@ -75,7 +75,7 @@ func ParseDecl(raw string) (Decl, error) {
 		return IntegerDecl(n), nil
 	}
 	if !strings.HasPrefix(s, "/") {
-		return Decl{}, fmt.Errorf("el panel 1 es de declaración: usa /ecuacion, /funcion o /expresion")
+		return Decl{}, errors.New("el panel 1 es de declaración: usa /ecuacion, /funcion o /expresion")
 	}
 
 	fields := strings.Fields(s)
@@ -95,7 +95,7 @@ func ParseDecl(raw string) (Decl, error) {
 	case strings.HasPrefix(cmd, "func"):
 		d.Tipo = DeclFuncion
 		if strings.Contains(content, "=") {
-			return Decl{}, fmt.Errorf("una función no lleva '=': /funcion 2x+2")
+			return Decl{}, errors.New("una función no lleva '=': /funcion 2x+2")
 		}
 		if _, err := ParseExpr(content); err != nil {
 			return Decl{}, err
@@ -103,7 +103,7 @@ func ParseDecl(raw string) (Decl, error) {
 	case strings.HasPrefix(cmd, "expres"):
 		d.Tipo = DeclExpresion
 		if strings.Contains(content, "=") {
-			return Decl{}, fmt.Errorf("una expresión no lleva '=': /expresion x^2+1")
+			return Decl{}, errors.New("una expresión no lleva '=': /expresion x^2+1")
 		}
 		if _, err := ParseExpr(content); err != nil {
 			return Decl{}, err
@@ -130,7 +130,7 @@ func ParseDecl(raw string) (Decl, error) {
 func parsePoints(content string) ([]Point, error) {
 	groups := splitPointGroups(content)
 	if len(groups) < 2 {
-		return nil, fmt.Errorf("se necesitan al menos 2 puntos: ej. /puntos (1,2) (3,4)")
+		return nil, errors.New("se necesitan al menos 2 puntos: ej. /puntos (1,2) (3,4)")
 	}
 	pts := make([]Point, 0, len(groups))
 	xs := map[float64]bool{}
@@ -160,9 +160,7 @@ func splitPointGroups(content string) []string {
 	flush := func() {
 		rest := strings.Fields(cur.String())
 		cur.Reset()
-		for _, r := range rest {
-			groups = append(groups, r)
-		}
+		groups = append(groups, rest...)
 	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
@@ -171,9 +169,10 @@ func splitPointGroups(content string) []string {
 			depth := 1
 			j := i + 1
 			for j < len(s) && depth > 0 {
-				if s[j] == '(' {
+				switch s[j] {
+				case '(':
 					depth++
-				} else if s[j] == ')' {
+				case ')':
 					depth--
 				}
 				j++

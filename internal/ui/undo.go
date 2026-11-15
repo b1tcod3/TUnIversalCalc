@@ -1,9 +1,10 @@
 package ui
 
 import (
-	"github.com/charmbracelet/bubbles/textinput"
-
+	"maps"
 	"tuniversalcalc/internal/engine"
+
+	"github.com/charmbracelet/bubbles/textinput"
 )
 
 const maxUndoLevels = 50
@@ -56,9 +57,7 @@ func (m *Model) snapshot() uiSnapshot {
 		}
 		s.Objects[name] = cp
 	}
-	for t, n := range m.counters {
-		s.Counters[t] = n
-	}
+	maps.Copy(s.Counters, m.counters)
 	return s
 }
 

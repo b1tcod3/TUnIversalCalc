@@ -4,8 +4,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
 	"tuniversalcalc/internal/engine"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // ansiRe quita los códigos de escape CSI (colores, cursor) para medir el
@@ -99,6 +100,16 @@ func newFlowModel() Model {
 	m.width, m.height = 100, 28
 	m.updateLayout()
 	return m
+}
+
+// mustResultMsg ejecuta el comando y exige que produzca un ResultMsg.
+func mustResultMsg(t *testing.T, cmd tea.Cmd) ResultMsg {
+	t.Helper()
+	msg, ok := cmd().(ResultMsg)
+	if !ok {
+		t.Fatalf("el comando no produjo ResultMsg: %T", msg)
+	}
+	return msg
 }
 
 // declararEcuacion registra e1 = 2x + 2 = 0 vía el panel 1.
@@ -229,7 +240,7 @@ func TestNewtonObjetoExplicito(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("debe lanzarse el comando async")
 	}
-	res := cmd().(ResultMsg)
+	res := mustResultMsg(t, cmd)
 	if res.Err != nil {
 		t.Fatalf("newton falló: %v", res.Err)
 	}

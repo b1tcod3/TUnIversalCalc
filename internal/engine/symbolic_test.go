@@ -82,10 +82,11 @@ func TestDeriveChainRuleSteps(t *testing.T) {
 	if got := r.Ascii(); got != "2*cos(x^2)*x" {
 		t.Fatalf("Derive(sin(x^2)) = %q", got)
 	}
-	var all string
+	var sb strings.Builder
 	for _, s := range steps {
-		all += s + "\n"
+		sb.WriteString(s + "\n")
 	}
+	all := sb.String()
 	if !strings.Contains(all, "cadena") {
 		t.Fatalf("pasos sin regla de la cadena:\n%s", all)
 	}
@@ -132,10 +133,11 @@ func TestSolveEquationLHSRHS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Solve(x+1=2x-3): %v", err)
 	}
-	var all string
+	var sb strings.Builder
 	for _, s := range steps {
-		all += s + "\n"
+		sb.WriteString(s + "\n")
 	}
+	all := sb.String()
 	if !strings.Contains(all, "x = 4") {
 		t.Fatalf("solución esperada x = 4:\n%s", all)
 	}
@@ -146,10 +148,11 @@ func TestSolveQuadratic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Solve(x^2-4): %v", err)
 	}
-	var all string
+	var sb strings.Builder
 	for _, s := range steps {
-		all += s + "\n"
+		sb.WriteString(s + "\n")
 	}
+	all := sb.String()
 	if !strings.Contains(all, "x = 2") || !strings.Contains(all, "x = -2") {
 		t.Fatalf("raíces esperadas ±2:\n%s", all)
 	}

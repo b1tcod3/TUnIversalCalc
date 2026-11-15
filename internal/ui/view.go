@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"tuniversalcalc/internal/engine"
 
 	"github.com/charmbracelet/lipgloss"
-
-	"tuniversalcalc/internal/engine"
 )
 
-func (m *Model) View() string {
+func (m *Model) View() string { //nolint:gocyclo // composición de los tres paneles en una sola pasada
 	if m.helpOpen {
 		return m.helpView()
 	}
@@ -54,8 +53,8 @@ func (m *Model) View() string {
 	case !m.declValid:
 		calcContent = hintStyle.Render("⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /puntos (1,2) (3,4) (Enter)")
 	}
-	if !(m.palette.Open && m.palette.Anchor == FocusCmd) &&
-		!(m.completion.Open && m.completion.Anchor == FocusCmd) {
+	if (!m.palette.Open || m.palette.Anchor != FocusCmd) &&
+		(!m.completion.Open || m.completion.Anchor != FocusCmd) {
 		if pv := m.previewView(); pv != "" {
 			calcContent += "\n\n" + pv
 		}

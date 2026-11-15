@@ -1,11 +1,11 @@
 package ui
 
 import (
+	"tuniversalcalc/internal/engine"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-
-	"tuniversalcalc/internal/engine"
 )
 
 // Focus identifica qué panel tiene el cursor.

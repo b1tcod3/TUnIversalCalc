@@ -11,9 +11,9 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 	if m.helpOpen {
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
-			m.helpViewport.LineUp(3)
+			m.helpViewport.ScrollUp(3)
 		case tea.MouseButtonWheelDown:
-			m.helpViewport.LineDown(3)
+			m.helpViewport.ScrollDown(3)
 		}
 		return nil, true
 	}

@@ -40,7 +40,7 @@ func TestHandleEnterAsignaReqID(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("se esperaba comando")
 	}
-	msg := cmd().(ResultMsg)
+	msg := mustResultMsg(t, cmd)
 	if msg.ReqID == 0 || msg.ReqID != m.pendingReq {
 		t.Fatalf("ReqID = %d, pendingReq = %d", msg.ReqID, m.pendingReq)
 	}
