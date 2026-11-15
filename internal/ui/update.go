@@ -6,11 +6,11 @@ import (
 	"strings"
 	"tuniversalcalc/internal/engine"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // despachador central de mensajes del bucle Elm
+//nolint:gocyclo // despachador central de mensajes del bucle Elm
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -47,7 +47,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // d
 		}
 		if msg.err != nil {
 			m.addLog(LevelError, "No se pudo guardar la sesión: "+msg.err.Error())
-		} else if sessionFingerprint(m.sessionData()) == msg.fingerprint {
+			return m, nil
+		}
+		if sessionFingerprint(m.sessionData()) == msg.fingerprint {
 			m.dirty = false
 		}
 		return m, nil
@@ -70,11 +72,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo // d
 		return m, cmd
 	}
 	oldValue := m.focusedInputValue()
+	ti := &m.cmdInput
 	if m.focus == FocusDecl {
-		m.declInput, cmd = m.declInput.Update(msg)
-	} else {
-		m.cmdInput, cmd = m.cmdInput.Update(msg)
+		ti = &m.declInput
 	}
+	*ti, cmd = ti.Update(msg)
 	if m.focusedInputValue() != oldValue {
 		m.dirty = true
 		if m.focus == FocusCmd {
@@ -120,7 +122,9 @@ func (m *Model) applyResult(res ResultMsg) {
 
 // handleKey procesa una tecla. El segundo valor indica si el mensaje quedó
 // manejado; si no, cae al input enfocado.
-func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) { //nolint:gocyclo // un case por atajo de teclado, sin lógica anidada
+//
+//nolint:gocyclo // un case por atajo de teclado, sin lógica anidada
+func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	// El selector de sesiones es modal y tiene prioridad.
 	if m.picker.open {
 		return m.handleSessionPickerKey(msg)
@@ -235,11 +239,9 @@ func (m *Model) handlePaletteKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 // jumpNextTemplateField salta al siguiente marcador "?" de la plantilla
 // del input enfocado (Shift+Tab).
 func (m *Model) jumpNextTemplateField() {
-	var ti *textinput.Model
+	ti := &m.cmdInput
 	if m.focus == FocusDecl {
 		ti = &m.declInput
-	} else {
-		ti = &m.cmdInput
 	}
 	if !HasFields(ti.Value()) {
 		return
@@ -344,9 +346,9 @@ func (m *Model) handleEnter() tea.Cmd {
 //   - /lagrange x     → último objeto, variable x
 //   - /lagrange t1    → objeto t1
 //   - /newton g1      → error si "g1" no es un objeto declarado
-func (m *Model) resolveTarget(cmd string) (engine.Decl, string, bool) {
-	toks := splitCommandTokens(normalizeCommandArgs(cmd))
-	if d, ok := m.literalIntegerDecl(cmd); ok {
+func (m *Model) resolveTarget(command string) (engine.Decl, string, bool) {
+	toks := splitCommandTokens(normalizeCommandArgs(command))
+	if d, ok := m.literalIntegerDecl(command); ok {
 		return d, "x", true
 	}
 	decl, varName, err := m.resolveTargetTokens(toks)
@@ -407,8 +409,8 @@ func (m *Model) defaultTargetName() (string, error) {
 
 // literalIntegerDecl permite usar /factorizar 120 sin declarar el número
 // como objeto. Solo aplica al comando de factorización.
-func (m *Model) literalIntegerDecl(cmd string) (engine.Decl, bool) {
-	toks := splitCommandTokens(normalizeCommandArgs(cmd))
+func (m *Model) literalIntegerDecl(command string) (engine.Decl, bool) {
+	toks := splitCommandTokens(normalizeCommandArgs(command))
 	if len(toks) < 2 || !isFactorCommand(toks[0]) {
 		return engine.Decl{}, false
 	}

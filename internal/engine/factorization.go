@@ -85,7 +85,8 @@ func absInt64(n int64) uint64 {
 // factorización vacía con el signo correspondiente.
 func Factorize(n int64) Factorization {
 	f := Factorization{Original: n, Negative: n < 0}
-	if n == 0 || n == 1 || n == -1 {
+	switch n {
+	case 0, 1, -1:
 		return f
 	}
 	f.Factors = factorizeUint64(absInt64(n))
@@ -265,12 +266,7 @@ func pollardRho(n uint64) uint64 {
 			x = addMod(mulMod(x, x, n), c, n)
 			y = addMod(mulMod(y, y, n), c, n)
 			y = addMod(mulMod(y, y, n), c, n)
-			diff := x
-			if y > diff {
-				diff = y - diff
-			} else {
-				diff -= y
-			}
+			diff := max(x, y) - min(x, y)
 			d = gcd64(diff, n)
 		}
 		if d != n {
@@ -356,7 +352,12 @@ func evalFactorizar(decl Decl) ([]string, error) {
 	mag := absInt64(n)
 	steps = append(steps, "N = "+strconv.FormatUint(mag, 10))
 
-	if len(f.Groups) == 1 && f.Groups[0].Exp == 1 && f.Groups[0].Prime == mag {
+	isPrime := false
+	if len(f.Groups) == 1 {
+		g := f.Groups[0]
+		isPrime = g.Exp == 1 && g.Prime == mag
+	}
+	if isPrime {
 		steps = append(steps, fmt.Sprintf("%d es primo", mag))
 	} else {
 		cur := mag

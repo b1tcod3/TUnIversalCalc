@@ -69,19 +69,16 @@ func (m *Model) refreshPalette() {
 		return
 	}
 	frag := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(raw, "/")))
-	if frag == "" {
-		m.palette.List = buildPalette(list, "")
-		m.palette.Open = len(m.palette.List) > 0
-	} else {
+	if frag != "" {
 		for i := range list {
 			if strings.ToLower(list[i].Trigger) == frag {
 				m.closePalette() // coincidencia exacta: el usuario escribe la orden a mano
 				return
 			}
 		}
-		m.palette.List = buildPalette(list, frag)
-		m.palette.Open = len(m.palette.List) > 0
 	}
+	m.palette.List = buildPalette(list, frag)
+	m.palette.Open = len(m.palette.List) > 0
 
 	if !wasOpen && m.palette.Open {
 		m.palette.Sel, m.palette.Off = 0, 0
@@ -146,13 +143,12 @@ func (m *Model) paletteSelect() {
 	m.invalidatePending()
 	m.clearPreview()
 	val, pos := JumpNextField(tpl.InsertText, 0)
+	ti := &m.cmdInput
 	if m.focus == FocusDecl {
-		m.declInput.SetValue(val)
-		m.declInput.SetCursor(pos)
-	} else {
-		m.cmdInput.SetValue(val)
-		m.cmdInput.SetCursor(pos)
+		ti = &m.declInput
 	}
+	ti.SetValue(val)
+	ti.SetCursor(pos)
 	m.dirty = true
 	m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
 }
@@ -170,12 +166,11 @@ func (m *Model) paletteView() string {
 	for i := from; i < to; i++ {
 		t := m.palette.List[i]
 		line := clampWidth(t.Trigger+"  "+t.InsertText+"  — "+t.Desc, innerW)
+		style := paletteRowStyle
 		if i == m.palette.Sel {
-			line = paletteSelStyle.Render(line)
-		} else {
-			line = paletteRowStyle.Render(line)
+			style = paletteSelStyle
 		}
-		lines = append(lines, line)
+		lines = append(lines, style.Render(line))
 	}
 	return strings.Join(lines, "\n")
 }

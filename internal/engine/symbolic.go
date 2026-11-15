@@ -526,13 +526,12 @@ func (d *deriver) deriveCall(n Call) (Expr, error) {
 func Simplify(e Expr) (Expr, []string, error) {
 	orig := e.Ascii()
 	res := simplifyNormaliza(e)
-	var steps []string
+	steps := []string{"La expresión ya está en forma simplificada"}
 	if res.Ascii() != orig {
-		steps = append(steps,
+		steps = []string{
 			"Agrupando términos semejantes y plegando constantes...",
-			orig+"  →  "+res.Ascii())
-	} else {
-		steps = append(steps, "La expresión ya está en forma simplificada")
+			orig + "  →  " + res.Ascii(),
+		}
 	}
 	return res, steps, nil
 }
@@ -561,8 +560,11 @@ func Solve(lhs, rhs Expr, v byte) ([]string, error) {
 	for _, t := range collectTerms(whole) {
 		deg := termDegree(t.rest, v)
 		if deg < 0 {
-			return nil, fmt.Errorf("término %q depende de %q de forma no polinómica — resolución analítica no soportada aún",
-				termKey(t), string(v))
+			return nil, fmt.Errorf(
+				"término %q depende de %q de forma no polinómica: sin soporte analítico",
+				termKey(t),
+				string(v),
+			)
 		}
 		coeffs[deg] += t.coeff
 	}
@@ -571,7 +573,9 @@ func Solve(lhs, rhs Expr, v byte) ([]string, error) {
 
 	switch {
 	case a != 0:
-		steps = append(steps, "Ecuación cuadrática: "+formatNum(a)+"·"+string(v)+"² + "+formatNum(b)+"·"+string(v)+" + "+formatNum(c)+" = 0")
+		eq := "Ecuación cuadrática: " + formatNum(a) + "·" + string(v) + "² + " +
+			formatNum(b) + "·" + string(v) + " + " + formatNum(c) + " = 0"
+		steps = append(steps, eq)
 		disc := b*b - 4*a*c
 		steps = append(steps, "Discriminante Δ = b² − 4ac = "+formatNum(disc))
 		if disc < 0 {
@@ -672,11 +676,11 @@ func constTermExpr(e Expr, v byte) Expr {
 }
 
 func cExprAscii(e Expr) string {
-	if n, ok := e.(Num); ok && !n.isNeg() && !n.isZero() {
+	if n, ok := e.(Num); ok {
+		if n.isNeg() || n.isZero() {
+			return "(" + n.Text + ")"
+		}
 		return n.Text
-	}
-	if n, ok := e.(Num); ok && n.isNeg() {
-		return "(" + n.Text + ")"
 	}
 	return "(" + e.Ascii() + ")"
 }
@@ -841,7 +845,7 @@ func Limit(e Expr, v byte, a Value) (Expr, []string, error) {
 			f = lHopital(f, v)
 		}
 	}
-	return nil, nil, errors.New("límite indeterminado (0/0 o ∞/∞) que no se resuelve con dos derivadas: sin soportar aún")
+	return nil, nil, errors.New("límite indeterminado (0/0 o ∞/∞) tras dos derivadas: sin soporte aún")
 }
 
 // lHopital aplica un paso de la regla de L'Hôpital: si f es un cociente

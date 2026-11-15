@@ -9,7 +9,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func (m *Model) View() string { //nolint:gocyclo // composición de los tres paneles en una sola pasada
+//nolint:gocyclo // composición de los tres paneles en una sola pasada
+func (m *Model) View() string {
 	if m.helpOpen {
 		return m.helpView()
 	}
@@ -26,11 +27,13 @@ func (m *Model) View() string { //nolint:gocyclo // composición de los tres pan
 		exprStyle = exprPanelActive
 	}
 	exprStyle = exprStyle.Width(lw - panelBorder).Height(m.leftHeight() - panelBorder)
+	paletteInDecl := m.palette.Open && m.palette.Anchor == FocusDecl
+	completionInDecl := m.completion.Open && m.completion.Anchor == FocusDecl
 	exprBody := m.declInput.View()
 	switch {
-	case m.palette.Open && m.palette.Anchor == FocusDecl:
+	case paletteInDecl:
 		exprBody += "\n\n" + m.paletteView()
-	case m.completion.Open && m.completion.Anchor == FocusDecl:
+	case completionInDecl:
 		exprBody += "\n\n" + m.completionView()
 	default:
 		exprBody += m.declEchoLine()
@@ -42,18 +45,19 @@ func (m *Model) View() string { //nolint:gocyclo // composición de los tres pan
 	panel1 := exprStyle.Render(panel1Content)
 
 	// --- PANEL 2: CÁLCULO (bloqueado sin objetos declarados) ---
+	paletteInCmd := m.palette.Open && m.palette.Anchor == FocusCmd
+	completionInCmd := m.completion.Open && m.completion.Anchor == FocusCmd
 	calcContent := m.cmdInput.View()
 	switch {
-	case m.palette.Open && m.palette.Anchor == FocusCmd:
+	case paletteInCmd:
 		calcContent += "\n\n" + m.paletteView()
-	case m.completion.Open && m.completion.Anchor == FocusCmd:
+	case completionInCmd:
 		calcContent += "\n\n" + m.completionView()
 	case !m.declValid:
 		hint := "⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /puntos (1,2) (3,4) (Enter)"
 		calcContent = hintStyle.Render(clampLines(hint, innerL))
 	}
-	if (!m.palette.Open || m.palette.Anchor != FocusCmd) &&
-		(!m.completion.Open || m.completion.Anchor != FocusCmd) {
+	if !paletteInCmd && !completionInCmd {
 		if pv := m.previewView(); pv != "" {
 			calcContent += "\n\n" + pv
 		}
@@ -83,10 +87,9 @@ func (m *Model) View() string { //nolint:gocyclo // composición de los tres pan
 	leftColumn := lipgloss.JoinVertical(lipgloss.Top, panel1, panel2)
 	grid := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, panel3)
 
-	help := helpStyle.Render(clampWidth(
-		"[Tab] Panel • [Enter] Ejecutar • [Ctrl+O] Sesiones • [Ctrl+Z/Y] Undo/Redo • [Ctrl+H] Ayuda • [Ctrl+S] Guardar • [Esc] Salir",
-		m.width,
-	))
+	helpText := "[Tab] Panel • [Enter] Ejecutar • [Ctrl+O] Sesiones • " +
+		"[Ctrl+Z/Y] Undo/Redo • [Ctrl+H] Ayuda • [Ctrl+S] Guardar • [Esc] Salir"
+	help := helpStyle.Render(clampWidth(helpText, m.width))
 
 	// Sin newlines externos: el alto total debe ser exactamente m.height
 	// para que la terminal no haga scroll y corte la parte superior.

@@ -59,9 +59,9 @@ func (m *Model) handlePreviewTick(msg previewTickMsg) tea.Cmd {
 	return previewEvalCmd(decl, val, varName, msg.Seq)
 }
 
-func previewEvalCmd(decl engine.Decl, cmd, varName string, seq int) tea.Cmd {
+func previewEvalCmd(decl engine.Decl, command, varName string, seq int) tea.Cmd {
 	return func() tea.Msg {
-		steps, err := engine.Evaluate(decl, cmd, varName)
+		steps, err := engine.Evaluate(decl, command, varName)
 		return previewResultMsg{Seq: seq, Steps: steps, Err: err}
 	}
 }
@@ -91,9 +91,9 @@ func (m *Model) clearPreview() {
 
 // previewTarget es como resolveTarget pero sin escribir en el log: se usa
 // mientras el usuario escribe y todavía puede haber un comando incompleto.
-func (m *Model) previewTarget(cmd string) (engine.Decl, string, bool) {
-	toks := splitCommandTokens(normalizeCommandArgs(cmd))
-	if d, ok := m.literalIntegerDecl(cmd); ok {
+func (m *Model) previewTarget(command string) (engine.Decl, string, bool) {
+	toks := splitCommandTokens(normalizeCommandArgs(command))
+	if d, ok := m.literalIntegerDecl(command); ok {
 		return d, "x", true
 	}
 	decl, varName, err := m.resolveTargetTokens(toks)
@@ -116,8 +116,8 @@ func (m *Model) previewView() string {
 }
 
 // normalizeCommandArgs limpia el comando para separar operación y argumentos.
-func normalizeCommandArgs(cmd string) string {
-	return strings.NewReplacer("(", "", ")", "", ",", "").Replace(cmd)
+func normalizeCommandArgs(command string) string {
+	return strings.NewReplacer("(", "", ")", "", ",", "").Replace(command)
 }
 
 func splitCommandTokens(s string) []string {

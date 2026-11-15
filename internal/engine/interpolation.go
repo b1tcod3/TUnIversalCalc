@@ -255,27 +255,24 @@ func formatPoly(c []float64) string {
 		case 0:
 			term = coefStr
 		case 1:
+			term = coefStr + "x"
 			if coefStr == "1" {
 				term = "x"
-			} else {
-				term = coefStr + "x"
 			}
 		default:
+			term = coefStr + "x" + supExponent(d)
 			if coefStr == "1" {
 				term = "x" + supExponent(d)
-			} else {
-				term = coefStr + "x" + supExponent(d)
 			}
 		}
+		prefix := sign + " "
 		if len(parts) == 0 {
+			prefix = ""
 			if sign == "−" {
-				parts = append(parts, "−"+term)
-			} else {
-				parts = append(parts, term)
+				prefix = "−"
 			}
-		} else {
-			parts = append(parts, sign+" "+term)
 		}
+		parts = append(parts, prefix+term)
 	}
 	if len(parts) == 0 {
 		return "0"

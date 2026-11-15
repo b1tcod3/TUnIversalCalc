@@ -95,7 +95,14 @@ func TestEvaluateFactorizar(t *testing.T) {
 		t.Fatalf("Evaluate: %v", err)
 	}
 	all := strings.Join(steps, "|")
-	for _, frag := range []string{"N = 120", "÷2 (3 veces)", "÷3 (1 vez)", "Factorización: 2³ · 3 · 5", "Forma expandida: 2 · 2 · 2 · 3 · 5"} {
+	fragments := []string{
+		"N = 120",
+		"÷2 (3 veces)",
+		"÷3 (1 vez)",
+		"Factorización: 2³ · 3 · 5",
+		"Forma expandida: 2 · 2 · 2 · 3 · 5",
+	}
+	for _, frag := range fragments {
 		if !strings.Contains(all, frag) {
 			t.Fatalf("falta %q en: %s", frag, all)
 		}

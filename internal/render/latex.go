@@ -43,7 +43,8 @@ func exponentLatex(s string, start int) (string, int) {
 		return inner, next
 	}
 	k := start
-	if k < len(s) && (s[k] == '+' || s[k] == '-') {
+	hasSign := k < len(s) && (s[k] == '+' || s[k] == '-')
+	if hasSign {
 		k++
 	}
 	for k < len(s) && isAlnum(s[k]) {

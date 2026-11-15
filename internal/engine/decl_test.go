@@ -84,7 +84,7 @@ func TestParseDeclPuntos(t *testing.T) {
 	if d.Tipo != DeclPuntos || len(d.Points) != 3 {
 		t.Fatalf("puntos mal clasificados: %+v", d)
 	}
-	want := []Point{{1, 2}, {3, 4}, {5, 6}}
+	want := []Point{{X: 1, Y: 2}, {X: 3, Y: 4}, {X: 5, Y: 6}}
 	for i, p := range d.Points {
 		if p != want[i] {
 			t.Fatalf("punto %d = %+v, se esperaba %+v", i, p, want[i])

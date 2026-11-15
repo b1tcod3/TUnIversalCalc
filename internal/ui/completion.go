@@ -198,11 +198,11 @@ func (m *Model) handleCompletionKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 
 	// Cualquier otra tecla se envía al input y se refiltra.
 	var cmd tea.Cmd
+	ti := &m.cmdInput
 	if m.focus == FocusDecl {
-		m.declInput, cmd = m.declInput.Update(msg)
-	} else {
-		m.cmdInput, cmd = m.cmdInput.Update(msg)
+		ti = &m.declInput
 	}
+	*ti, cmd = ti.Update(msg)
 	m.dirty = true
 	m.refreshPalette()
 	if m.palette.Open {
@@ -266,12 +266,11 @@ func (m *Model) completionView() string {
 	for i := from; i < to; i++ {
 		item := c.Items[i]
 		line := truncateVisual(item.Text+"  — "+item.Desc, innerW)
+		style := paletteRowStyle
 		if i == c.Sel {
-			line = paletteSelStyle.Render(line)
-		} else {
-			line = paletteRowStyle.Render(line)
+			style = paletteSelStyle
 		}
-		lines = append(lines, line)
+		lines = append(lines, style.Render(line))
 	}
 	return strings.Join(lines, "\n")
 }

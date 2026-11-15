@@ -28,16 +28,19 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return nil, false
 	}
-	if msg.X < 0 || msg.Y < 0 || msg.X >= m.width || msg.Y >= m.gridAvailable() {
+	if msg.X < 0 || msg.Y < 0 {
+		return nil, false
+	}
+	if msg.X >= m.width || msg.Y >= m.gridAvailable() {
 		return nil, false
 	}
 
 	if msg.X < m.leftWidth() {
+		focus := FocusDecl
 		if msg.Y >= m.leftHeight() {
-			m.focusPanel(FocusCmd)
-		} else {
-			m.focusPanel(FocusDecl)
+			focus = FocusCmd
 		}
+		m.focusPanel(focus)
 		return nil, true
 	}
 	return nil, true
@@ -59,9 +62,10 @@ func (m *Model) focusPanel(f Focus) {
 	m.focus = f
 	m.declInput.Blur()
 	m.cmdInput.Blur()
-	if f == FocusDecl {
+	switch f {
+	case FocusDecl:
 		m.declInput.Focus()
-	} else {
+	default:
 		m.cmdInput.Focus()
 	}
 }

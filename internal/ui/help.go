@@ -78,7 +78,13 @@ func (m *Model) helpView() string {
 	footer := clampWidth(helpFooterStyle.Render("↑/↓ línea · PgUp/PgDn página · Esc o Ctrl+H cerrar"), innerW)
 	content := title + "\n\n" + m.helpViewport.View() + "\n\n" + footer
 	box := helpBoxStyle.Width(boxWidth).Render(content)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		box,
+	)
 }
 
 // helpPlain devuelve el texto de ayuda sin formato, útil para tests.

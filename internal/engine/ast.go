@@ -78,7 +78,8 @@ func (n Num) Float() (float64, error) {
 		if len(parts) == 2 {
 			a, errA := strconv.ParseFloat(parts[0], 64)
 			b, errB := strconv.ParseFloat(parts[1], 64)
-			if errA == nil && errB == nil && b != 0 {
+			bothNumeric := errA == nil && errB == nil
+			if bothNumeric && b != 0 {
 				return a / b, nil
 			}
 		}
@@ -119,11 +120,11 @@ func (e Add) Ascii() string {
 		s := t.Ascii()
 		// un término negativo se imprime como resta
 		if strings.HasPrefix(s, "-") {
+			separator := "-"
 			if i > 0 {
-				b.WriteString(" - ")
-			} else {
-				b.WriteString("-")
+				separator = " - "
 			}
+			b.WriteString(separator)
 			b.WriteString(strings.TrimPrefix(s, "-"))
 			continue
 		}

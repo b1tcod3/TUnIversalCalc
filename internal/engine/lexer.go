@@ -91,7 +91,8 @@ func lexNumber(src string, start int) (Token, int, error) {
 		i++
 	}
 	text := src[start:i]
-	if dots > 1 || (src[start] == '.' && start+1 == i) {
+	leadingDot := src[start] == '.' && start+1 == i
+	if dots > 1 || leadingDot {
 		return Token{}, 0, fmt.Errorf("número mal formado %q (posición %d)", text, start)
 	}
 	return Token{Kind: TokNum, Text: text, Pos: start}, i, nil

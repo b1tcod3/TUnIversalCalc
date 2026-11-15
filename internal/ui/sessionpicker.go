@@ -342,11 +342,13 @@ func (m *Model) pickerView() string {
 		s := list[i]
 		line := padOrTrimVisual(s.Name, max(innerW-20, 4)) + "  " + s.Modified.Format("2006-01-02 15:04")
 		line = truncateVisual(line, max(innerW-2, 1))
+		prefix := "  "
+		style := paletteRowStyle
 		if i == m.picker.sel {
-			rows = append(rows, paletteSelStyle.Render("▶ "+line))
-		} else {
-			rows = append(rows, paletteRowStyle.Render("  "+line))
+			prefix = "▶ "
+			style = paletteSelStyle
 		}
+		rows = append(rows, style.Render(prefix+line))
 	}
 
 	footer := "↑/↓ seleccionar · Enter abrir · ^R renombrar · ^U duplicar · ^D borrar · Esc cerrar"
@@ -363,5 +365,11 @@ func (m *Model) pickerView() string {
 	content := clampWidth(helpTitleStyle.Render("Sesiones"), innerW) + "\n" + header + "\n\n" +
 		strings.Join(rows, "\n") + "\n\n" + helpFooterStyle.Render(truncateVisual(footer, innerW))
 	box := helpBoxStyle.Width(width).Render(content)
-	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+	return lipgloss.Place(
+		m.width,
+		m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		box,
+	)
 }

@@ -71,9 +71,10 @@ func (m *Model) restore(s uiSnapshot) {
 	m.focus = s.Focus
 	m.declInput.Blur()
 	m.cmdInput.Blur()
-	if m.focus == FocusDecl {
+	switch m.focus {
+	case FocusDecl:
 		m.declInput.Focus()
-	} else {
+	default:
 		m.cmdInput.Focus()
 	}
 

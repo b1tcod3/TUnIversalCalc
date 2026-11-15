@@ -104,7 +104,7 @@ func ListSessions() []SessionMeta {
 	if err != nil {
 		return nil
 	}
-	var out []SessionMeta
+	out := []SessionMeta{}
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), sessionExt) {
 			continue
@@ -395,9 +395,10 @@ func (m *Model) applySession(name string, data SessionData) {
 	m.focus = Focus(data.Focus)
 	m.declInput.Blur()
 	m.cmdInput.Blur()
-	if m.focus == FocusDecl {
+	switch m.focus {
+	case FocusDecl:
 		m.declInput.Focus()
-	} else {
+	default:
 		m.cmdInput.Focus()
 	}
 

@@ -22,7 +22,7 @@ func hasStep(steps []string, frag string) bool {
 }
 
 func TestLagrangeRecta(t *testing.T) {
-	steps, err := Lagrange([]Point{{1, 2}, {3, 4}, {5, 6}})
+	steps, err := Lagrange([]Point{{X: 1, Y: 2}, {X: 3, Y: 4}, {X: 5, Y: 6}})
 	if err != nil {
 		t.Fatalf("Lagrange: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestLagrangeRecta(t *testing.T) {
 }
 
 func TestLagrangeCuadratica(t *testing.T) {
-	steps, err := Lagrange([]Point{{0, 1}, {1, 3}, {2, 7}})
+	steps, err := Lagrange([]Point{{X: 0, Y: 1}, {X: 1, Y: 3}, {X: 2, Y: 7}})
 	if err != nil {
 		t.Fatalf("Lagrange: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestLagrangeCuadratica(t *testing.T) {
 }
 
 func TestNewtonRecta(t *testing.T) {
-	steps, err := Newton([]Point{{1, 2}, {3, 4}, {5, 6}})
+	steps, err := Newton([]Point{{X: 1, Y: 2}, {X: 3, Y: 4}, {X: 5, Y: 6}})
 	if err != nil {
 		t.Fatalf("Newton: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestNewtonRecta(t *testing.T) {
 }
 
 func TestNewtonCuadratica(t *testing.T) {
-	steps, err := Newton([]Point{{0, 1}, {1, 3}, {2, 7}})
+	steps, err := Newton([]Point{{X: 0, Y: 1}, {X: 1, Y: 3}, {X: 2, Y: 7}})
 	if err != nil {
 		t.Fatalf("Newton: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestNewtonCuadratica(t *testing.T) {
 
 func TestMisMatchMultiplicativo(t *testing.T) {
 	// x^2 a través de (-1,1) (0,0) (1,1)
-	steps, err := Newton([]Point{{-1, 1}, {0, 0}, {1, 1}})
+	steps, err := Newton([]Point{{X: -1, Y: 1}, {X: 0, Y: 0}, {X: 1, Y: 1}})
 	if err != nil {
 		t.Fatalf("Newton: %v", err)
 	}
@@ -88,14 +88,14 @@ func TestMisMatchMultiplicativo(t *testing.T) {
 }
 
 func TestInterpolationErrores(t *testing.T) {
-	if _, err := Lagrange([]Point{{1, 2}}); err == nil {
+	if _, err := Lagrange([]Point{{X: 1, Y: 2}}); err == nil {
 		t.Fatal("un solo punto debe fallar")
 	}
 	if _, err := Newton([]Point{}); err == nil {
 		t.Fatal("lista vacía debe fallar")
 	}
 	// abscisa repetida
-	dup := []Point{{1, 2}, {1, 5}, {3, 4}}
+	dup := []Point{{X: 1, Y: 2}, {X: 1, Y: 5}, {X: 3, Y: 4}}
 	if _, err := Lagrange(dup); err == nil || !strings.Contains(err.Error(), "repetida") {
 		t.Fatalf("abscisa repetida debe fallar: %v", err)
 	}

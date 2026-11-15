@@ -14,12 +14,12 @@ import (
 // El motor combina un parser simbólico (para funciones/expresiones) con
 // operaciones de cálculo numérico (interpolación polinómica). Los métodos
 // de interpolación trabajan sobre puntos declarados con /puntos.
-func Evaluate(decl Decl, cmd, _ string) ([]string, error) {
+func Evaluate(decl Decl, command, _ string) ([]string, error) {
 	if decl.Nombre == "" {
 		return nil, errors.New("objeto vacío: declara uno en el panel 1 (/puntos (1,2) (3,4))")
 	}
 
-	op := normalizeOp(cmd)
+	op := normalizeOp(command)
 	if op == "" {
 		return nil, errors.New("comando vacío en el panel 2")
 	}
@@ -36,8 +36,8 @@ func Evaluate(decl Decl, cmd, _ string) ([]string, error) {
 
 // normalizeOp limpia el comando del panel 2: minúsculas, sin "/" inicial
 // ni paréntesis o comas.
-func normalizeOp(cmd string) string {
-	op := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(cmd, "/")))
+func normalizeOp(command string) string {
+	op := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(command, "/")))
 	op = strings.NewReplacer("(", "", ")", "", ",", "").Replace(op)
 	return strings.TrimSpace(op)
 }
