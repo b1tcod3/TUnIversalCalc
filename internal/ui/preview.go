@@ -105,7 +105,7 @@ func (m *Model) previewTarget(cmd string) (engine.Decl, string, bool) {
 
 // previewView renderiza la última línea del resultado en vivo.
 func (m *Model) previewView() string {
-	w := max(m.leftWidth()-chromeInW-4, 10)
+	w := max(m.leftWidth()-panelBorder-inputPadX-2, 10)
 	if m.preview.err != nil {
 		return levelErrorStyle.Render(clampWidth("✗ "+m.preview.err.Error(), w))
 	}

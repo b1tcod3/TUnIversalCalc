@@ -55,6 +55,40 @@ func TestMouseClickPanel2Bloqueado(t *testing.T) {
 	}
 }
 
+// TestMouseClickCoincideConLayoutEstrecho verifica que el hit-testing usa el
+// mismo leftWidth/leftHeight que el render en una terminal de 40x12.
+func TestMouseClickCoincideConLayoutEstrecho(t *testing.T) {
+	m := NewModel()
+	m.width, m.height = 40, 12
+	m.updateLayout()
+	declararEcuacion(t, &m) // foco en panel 2
+	m.switchPanel()         // volver al panel 1
+
+	click := func(x, y int) bool {
+		t.Helper()
+		_, handled := m.handleMouse(tea.MouseMsg{
+			Action: tea.MouseActionPress,
+			Button: tea.MouseButtonLeft,
+			X:      x,
+			Y:      y,
+		})
+		return handled
+	}
+
+	if !click(5, m.leftHeight()) || m.focus != FocusCmd {
+		t.Fatalf("el clic en la mitad inferior no enfocó el panel 2: %v", m.focus)
+	}
+	if !click(5, m.leftHeight()-1) || m.focus != FocusDecl {
+		t.Fatalf("el clic en la mitad superior no enfocó el panel 1: %v", m.focus)
+	}
+	if click(5, m.gridAvailable()) {
+		t.Fatal("un clic en la barra de estado no debe manejarse como panel")
+	}
+	if m.focus != FocusDecl {
+		t.Fatalf("el clic fuera de la cuadrícula cambió el foco: %v", m.focus)
+	}
+}
+
 func TestMouseWheelScrollSalida(t *testing.T) {
 	m := newFlowModel()
 	for range 40 {

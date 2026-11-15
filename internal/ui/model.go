@@ -110,6 +110,8 @@ func NewModel() Model {
 	helpVp := viewport.New(0, 0)
 
 	m := Model{
+		width:        100,
+		height:       28,
 		declInput:    declTi,
 		cmdInput:     cmdTi,
 		output:       output,
@@ -127,6 +129,7 @@ func NewModel() Model {
 		},
 	}
 	m.output.SetContent(m.renderLog())
+	m.updateLayout()
 	return m
 }
 

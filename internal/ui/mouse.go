@@ -28,7 +28,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
 	if msg.Action != tea.MouseActionPress || msg.Button != tea.MouseButtonLeft {
 		return nil, false
 	}
-	if msg.X < 0 || msg.Y < 0 || msg.X >= m.width {
+	if msg.X < 0 || msg.Y < 0 || msg.X >= m.width || msg.Y >= m.gridAvailable() {
 		return nil, false
 	}
 

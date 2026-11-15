@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"regexp"
 	"strings"
 	"testing"
 	"tuniversalcalc/internal/engine"
@@ -9,20 +8,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// ansiRe quita los códigos de escape CSI (colores, cursor) para medir el
-// ancho real de una línea de la View.
-var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
-
-func stripANSI(s string) string {
-	return ansiRe.ReplaceAllString(s, "")
-}
-
 // TestViewFitsHeight garantiza que la View nunca desborde la terminal:
 // si lo hiciera, el terminal hace scroll y corta la parte superior
 // (banner incluido). También verifica el ancho de cada línea, ignorando
 // los códigos ANSI. Se comprueba con la paleta abierta en ambos paneles.
 func TestViewFitsHeight(t *testing.T) {
-	for _, size := range [][2]int{{100, 28}, {80, 24}, {60, 20}, {120, 34}} {
+	for _, size := range [][2]int{{40, 12}, {50, 16}, {60, 20}, {80, 24}, {100, 28}, {120, 40}} {
 		m := NewModel()
 		m.width, m.height = size[0], size[1]
 		m.updateLayout()
@@ -56,10 +47,79 @@ func checkView(t *testing.T, m *Model, size [2]int, label string) {
 			size[0], size[1], label, lines, m.height)
 	}
 	for i, l := range strings.Split(m.View(), "\n") {
-		if w := len([]rune(stripANSI(l))); w > size[0] {
+		if w := visualWidth(l); w > size[0] {
 			t.Errorf("%dx%d [%s]: línea %d mide %d columnas (> %d) → se corta a la derecha",
 				size[0], size[1], label, i+1, w, size[0])
 		}
+	}
+}
+
+// TestViewLlenaLaTerminal comprueba que la cuadrícula ocupa todo el ancho y
+// que la vista usa exactamente las filas de la terminal.
+func TestViewLlenaLaTerminal(t *testing.T) {
+	for _, size := range [][2]int{{40, 12}, {60, 20}, {80, 24}, {100, 28}, {120, 40}} {
+		m := NewModel()
+		m.width, m.height = size[0], size[1]
+		m.updateLayout()
+		m.declInput.SetValue("/funcion 2x+2")
+		m.declValid = true
+
+		lines := strings.Split(m.View(), "\n")
+		if len(lines) != size[1] {
+			t.Errorf("%dx%d: View mide %d líneas, se esperaban %d", size[0], size[1], len(lines), size[1])
+		}
+		maxW := 0
+		for _, l := range lines {
+			maxW = max(maxW, visualWidth(l))
+		}
+		if maxW != size[0] {
+			t.Errorf("%dx%d: ancho máximo %d, se esperaba llenar %d", size[0], size[1], maxW, size[0])
+		}
+	}
+}
+
+// TestViewConCaracteresAnchos garantiza que la medición ANSI-aware no se
+// desborda con emoji, CJK ni texto largo en la salida.
+func TestViewConCaracteresAnchos(t *testing.T) {
+	m := NewModel()
+	m.width, m.height = 40, 12
+	m.updateLayout()
+	m.declValid = true
+	m.addLog(LevelInfo, "😀漢字🙂‍↔️ "+strings.Repeat("ancho ", 20))
+	checkView(t, &m, [2]int{40, 12}, "emoji")
+}
+
+// TestViewConSesionLarga comprueba que la barra de estado se trunca aunque el
+// nombre de sesión no quepa.
+func TestViewConSesionLarga(t *testing.T) {
+	m := NewModel()
+	m.width, m.height = 40, 12
+	m.updateLayout()
+	m.declValid = true
+	m.sessionEnabled = true
+	m.sessionName = strings.Repeat("s", 80)
+	m.dirty = true
+	checkView(t, &m, [2]int{40, 12}, "sesion-larga")
+}
+
+// TestViewNoMutaDimensiones protege el ciclo Elm: View no debe cambiar el
+// tamaño del modelo al abrir la ayuda o el selector en terminales pequeñas.
+func TestViewNoMutaDimensiones(t *testing.T) {
+	m := NewModel()
+	m.width, m.height = 30, 10
+	m.updateLayout()
+
+	m.toggleHelp()
+	_ = m.View()
+	if m.width != 30 || m.height != 10 {
+		t.Fatalf("View mutó las dimensiones con la ayuda abierta: %dx%d", m.width, m.height)
+	}
+
+	m.toggleHelp()
+	m.picker.open = true
+	_ = m.View()
+	if m.width != 30 || m.height != 10 {
+		t.Fatalf("View mutó las dimensiones con el selector abierto: %dx%d", m.width, m.height)
 	}
 }
 

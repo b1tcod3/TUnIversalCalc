@@ -304,31 +304,29 @@ func (m *Model) switchToSession(name string) {
 	m.dirty = false
 }
 
-// pickerView renderiza el selector como pantalla completa.
+// pickerView renderiza el selector como pantalla completa. No muta el modelo:
+// los inputs se copian para ajustar su ancho solo durante el render.
 func (m *Model) pickerView() string {
-	if m.width < 40 {
-		m.width = 40
-	}
-	if m.height < 12 {
-		m.height = 12
-	}
+	width := max(m.width-4, 1) // Width incluye padding; el borde suma 2
+	innerW := max(width-2, 1)  // área de texto dentro del padding
 
-	width := max(m.width-4, 24)
-	m.picker.nameInput.Width = max(width-18, 10)
-
-	title := helpTitleStyle.Render("Sesiones")
-	header := m.picker.query.View()
+	query := m.picker.query
+	query.Width = max(innerW-2, 1) // deja sitio al prompt "> "
+	header := query.View()
 	switch m.picker.mode {
 	case pickerRename:
-		header = "Renombrar a: " + m.picker.nameInput.View()
+		name := m.picker.nameInput
+		name.Width = max(innerW-13, 5)
+		header = "Renombrar a: " + name.View()
 	case pickerConfirmDelete:
 		s, _ := m.picker.selected()
 		header = lipgloss.NewStyle().Foreground(colorError).Render(
-			"¿Eliminar \"" + truncateVisual(s.Name, width-24) + "\"? (y/N)")
+			"¿Eliminar \"" + truncateVisual(s.Name, max(innerW-24, 1)) + "\"? (y/N)")
 	}
+	header = clampWidth(header, innerW)
 
 	list := m.picker.filtered()
-	maxRows := max(m.height-10, 2)
+	maxRows := max(m.height-10, 1)
 	start := max(m.picker.sel-maxRows/2, 0)
 	end := start + maxRows
 	if end > len(list) {
@@ -338,11 +336,12 @@ func (m *Model) pickerView() string {
 
 	var rows []string
 	if len(list) == 0 {
-		rows = append(rows, lipgloss.NewStyle().Foreground(colorInfo).Render("  (sin coincidencias)"))
+		rows = append(rows, clampWidth(lipgloss.NewStyle().Foreground(colorInfo).Render("  (sin coincidencias)"), innerW))
 	}
 	for i := start; i < end; i++ {
 		s := list[i]
-		line := padOrTrimVisual(s.Name, width-22) + "  " + s.Modified.Format("2006-01-02 15:04")
+		line := padOrTrimVisual(s.Name, max(innerW-20, 4)) + "  " + s.Modified.Format("2006-01-02 15:04")
+		line = truncateVisual(line, max(innerW-2, 1))
 		if i == m.picker.sel {
 			rows = append(rows, paletteSelStyle.Render("▶ "+line))
 		} else {
@@ -361,8 +360,8 @@ func (m *Model) pickerView() string {
 		footer = m.picker.status
 	}
 
-	content := title + "\n" + header + "\n\n" + strings.Join(rows, "\n") +
-		"\n\n" + helpFooterStyle.Render(truncateVisual(footer, width))
+	content := clampWidth(helpTitleStyle.Render("Sesiones"), innerW) + "\n" + header + "\n\n" +
+		strings.Join(rows, "\n") + "\n\n" + helpFooterStyle.Render(truncateVisual(footer, innerW))
 	box := helpBoxStyle.Width(width).Render(content)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }

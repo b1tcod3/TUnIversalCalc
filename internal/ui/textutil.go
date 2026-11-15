@@ -45,3 +45,29 @@ func padOrTrimVisual(s string, width int) string {
 func clampWidth(s string, maxW int) string {
 	return truncateVisual(s, maxW)
 }
+
+// clampLines trunca cada línea de un bloque al ancho visual indicado. Evita
+// que Lipgloss envuelva texto dentro de un panel con borde.
+func clampLines(s string, maxW int) string {
+	if maxW <= 0 {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = truncateVisual(l, maxW)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// clipLines recorta un bloque a maxLines líneas. Se usa antes de renderizar
+// paneles con Height(): Lipgloss no trunca el contenido que excede el alto.
+func clipLines(s string, maxLines int) string {
+	if maxLines <= 0 {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) > maxLines {
+		lines = lines[:maxLines]
+	}
+	return strings.Join(lines, "\n")
+}

@@ -28,8 +28,8 @@ func (m *Model) toggleHelp() {
 
 // layoutHelp ajusta el viewport de ayuda al tamaño actual de la terminal.
 func (m *Model) layoutHelp() {
-	w := max(m.width-6, 20)
-	h := max(m.height-8, 3)
+	w := max(m.width-6, 1)
+	h := min(max(m.height-8, 1), max(m.height-6, 1))
 	m.helpViewport.Width = w
 	m.helpViewport.Height = h
 }
@@ -69,20 +69,15 @@ func (m *Model) handleHelpKey(msg tea.KeyMsg) (tea.Cmd, bool) {
 	return nil, true
 }
 
-// helpView renderiza la ayuda como una pantalla completa centrada.
+// helpView renderiza la ayuda como una pantalla completa centrada. No muta el
+// modelo: el viewport se dimensiona al abrir la ayuda y al redimensionar.
 func (m *Model) helpView() string {
-	if m.width < 40 {
-		m.width = 40
-	}
-	if m.height < 12 {
-		m.height = 12
-	}
-	m.layoutHelp()
-
-	title := helpTitleStyle.Render("Ayuda de TUnIversalCalc")
-	footer := helpFooterStyle.Render("↑/↓ línea · PgUp/PgDn página · Esc o Ctrl+H cerrar")
+	boxWidth := max(m.width-4, 1)
+	innerW := max(boxWidth-2, 1)
+	title := clampWidth(helpTitleStyle.Render("Ayuda de TUnIversalCalc"), innerW)
+	footer := clampWidth(helpFooterStyle.Render("↑/↓ línea · PgUp/PgDn página · Esc o Ctrl+H cerrar"), innerW)
 	content := title + "\n\n" + m.helpViewport.View() + "\n\n" + footer
-	box := helpBoxStyle.Width(m.width - 4).Render(content)
+	box := helpBoxStyle.Width(boxWidth).Render(content)
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 

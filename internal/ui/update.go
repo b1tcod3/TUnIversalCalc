@@ -520,17 +520,15 @@ func (m *Model) renderLog() string {
 
 // --- Layout dinámico ---
 
-// Chrome (borde + padding) que lipgloss suma POR ENCIMA de Width/Height:
-//   - inputPanel: Padding(0,1) → 4 cols (2 borde + 2 padX), 2 filas (borde)
-//   - outputPanel: Padding(1)   → 4 cols, 4 filas (borde + 2 padY)
-// Width() y Height() fijan el ÁREA DE CONTENIDO, así que los paneles se
-// dimensionan restando el chrome para que el total sea exacto.
+// En Lipgloss v1 Width/Height incluyen el padding pero no el borde.
+// Los paneles restan solo el borde al fijar Width/Height; para calcular el
+// área de texto hay que restar además el padding correspondiente.
 
 const (
-	chromeInW  = 4
-	chromeInH  = 2
-	chromeOutW = 4
-	chromeOutH = 4
+	panelBorder = 2 // borde de cualquier panel
+	inputPadX   = 2 // Padding(0,1) del panel de entrada
+	outputPadX  = 2 // Padding(1) horizontal del panel de salida
+	outputPadY  = 2 // Padding(1) vertical del panel de salida
 )
 
 // updateLayout recalcula las dimensiones de los componentes según el tamaño
@@ -541,15 +539,15 @@ func (m *Model) updateLayout() {
 	}
 	lw, rw := m.leftWidth(), m.rightWidth()
 	_, rh := m.leftHeight(), m.rightHeight()
-	contentW := lw - chromeInW - chromeInW // área interior de los paneles 1/2
+	contentW := lw - panelBorder - inputPadX // área de texto de los paneles 1/2
 
 	// margen para el prompt "❯ "
 	m.declInput.Width = max(contentW-3, 10)
 	m.cmdInput.Width = max(contentW-3, 10)
 
 	// El viewport ocupa el contenido del panel 3 tras la cabecera
-	w := rw - chromeOutW - chromeOutW
-	h := (rh - chromeOutH) - m.panel3HeaderRows()
+	w := rw - panelBorder - outputPadX
+	h := (rh - panelBorder - outputPadY) - m.panel3HeaderRows()
 	if w < 6 {
 		w = 6
 	}
@@ -561,8 +559,8 @@ func (m *Model) updateLayout() {
 
 	// Filas visibles de la paleta: contenido del panel menos título,
 	// blanco e input. 2..7 para que nunca desborde el layout.
-	m.palette.Max = min(max(m.leftHeight()-chromeInH-4, 2), 7)
-	m.completion.Max = min(max(m.leftHeight()-chromeInH-4, 2), 7)
+	m.palette.Max = min(max(m.leftHeight()-panelBorder-4, 2), 7)
+	m.completion.Max = min(max(m.leftHeight()-panelBorder-4, 2), 7)
 	if m.completion.Open {
 		m.clampCompletion()
 	}
@@ -570,11 +568,13 @@ func (m *Model) updateLayout() {
 
 func (m *Model) leftWidth() int {
 	w := max(m.width*50/100, 45)
-	return w
+	// En terminales estrechas reserva al menos 12 columnas para el panel de
+	// salida en lugar de dejar que rightWidth() se vuelva negativo.
+	return min(w, max(m.width-12, 1))
 }
 
 func (m *Model) rightWidth() int {
-	return m.width - m.leftWidth() - 3
+	return m.width - m.leftWidth()
 }
 
 func (m *Model) leftHeight() int {

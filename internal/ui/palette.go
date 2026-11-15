@@ -163,7 +163,7 @@ func (m *Model) paletteView() string {
 	if !m.palette.Open || len(m.palette.List) == 0 {
 		return ""
 	}
-	innerW := m.leftWidth() - chromeInW - chromeInW
+	innerW := m.leftWidth() - panelBorder - inputPadX
 	var lines []string
 	from := m.palette.Off
 	to := min(from+m.palette.Max, len(m.palette.List))

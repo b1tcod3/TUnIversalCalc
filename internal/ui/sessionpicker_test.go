@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 	"tuniversalcalc/internal/engine"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -74,6 +75,23 @@ func TestSessionPickerViewCabe(t *testing.T) {
 	small.picker.open = true
 	small.picker.items = []SessionMeta{{Name: "alfa"}}
 	checkView(t, &small, [2]int{40, 12}, "selector-sesiones-pequeño")
+}
+
+func TestSessionPickerModalesCaben(t *testing.T) {
+	m := NewModel()
+	m.width, m.height = 40, 12
+	m.updateLayout()
+	m.picker.open = true
+	m.picker.items = []SessionMeta{{
+		Name:     "una-sesion-con-nombre-larguisimo",
+		Modified: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+	}}
+	m.picker.mode = pickerRename
+	m.picker.nameInput.SetValue("nuevo-nombre-igual-de-largo")
+	checkView(t, &m, [2]int{40, 12}, "selector-renombrar")
+
+	m.picker.mode = pickerConfirmDelete
+	checkView(t, &m, [2]int{40, 12}, "selector-confirmar-borrado")
 }
 
 func TestSessionPickerRenombrar(t *testing.T) {

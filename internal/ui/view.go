@@ -17,21 +17,15 @@ func (m *Model) View() string { //nolint:gocyclo // composición de los tres pan
 		return m.pickerView()
 	}
 
-	// Antes del primer WindowSizeMsg usamos dimensiones por defecto
-	if m.width == 0 || m.height == 0 {
-		m.width, m.height = 100, 28
-		m.updateLayout()
-	}
-
 	lw, rw := m.leftWidth(), m.rightWidth()
-	innerL, innerR := lw-chromeInW-chromeInW, rw-chromeOutW-chromeOutW
+	innerL, innerR := lw-panelBorder-inputPadX, rw-panelBorder-outputPadX
 
 	// --- PANEL 1: DECLARACIÓN ---
 	exprStyle := exprPanelInactive
 	if m.focus == FocusDecl {
 		exprStyle = exprPanelActive
 	}
-	exprStyle = exprStyle.Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
+	exprStyle = exprStyle.Width(lw - panelBorder).Height(m.leftHeight() - panelBorder)
 	exprBody := m.declInput.View()
 	switch {
 	case m.palette.Open && m.palette.Anchor == FocusDecl:
@@ -41,7 +35,11 @@ func (m *Model) View() string { //nolint:gocyclo // composición de los tres pan
 	default:
 		exprBody += m.declEchoLine()
 	}
-	panel1 := exprStyle.Render(titleRight(" 1. Declaración ", " Declaración ", colorExprActive, innerL) + "\n\n" + exprBody)
+	panel1Content := clipLines(
+		titleRight(" 1. Declaración ", " Declaración ", colorExprActive, innerL)+"\n\n"+exprBody,
+		m.leftHeight()-panelBorder,
+	)
+	panel1 := exprStyle.Render(panel1Content)
 
 	// --- PANEL 2: CÁLCULO (bloqueado sin objetos declarados) ---
 	calcContent := m.cmdInput.View()
@@ -51,7 +49,8 @@ func (m *Model) View() string { //nolint:gocyclo // composición de los tres pan
 	case m.completion.Open && m.completion.Anchor == FocusCmd:
 		calcContent += "\n\n" + m.completionView()
 	case !m.declValid:
-		calcContent = hintStyle.Render("⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /puntos (1,2) (3,4) (Enter)")
+		hint := "⛔ Sin objetos declarados\n   Declara en el panel 1:\n   /puntos (1,2) (3,4) (Enter)"
+		calcContent = hintStyle.Render(clampLines(hint, innerL))
 	}
 	if (!m.palette.Open || m.palette.Anchor != FocusCmd) &&
 		(!m.completion.Open || m.completion.Anchor != FocusCmd) {
@@ -63,14 +62,22 @@ func (m *Model) View() string { //nolint:gocyclo // composición de los tres pan
 	if m.focus == FocusCmd && m.declValid {
 		calcStyle = calcPanelActive
 	}
-	calcStyle = calcStyle.Width(lw - chromeInW).Height(m.leftHeight() - chromeInH)
-	panel2 := calcStyle.Render(titleRight(" 2. Operación/Comando ", " Comando ", colorCalcActive, innerL) + "\n\n" + calcContent)
+	calcStyle = calcStyle.Width(lw - panelBorder).Height(m.leftHeight() - panelBorder)
+	panel2Content := clipLines(
+		titleRight(" 2. Operación/Comando ", " Comando ", colorCalcActive, innerL)+"\n\n"+calcContent,
+		m.leftHeight()-panelBorder,
+	)
+	panel2 := calcStyle.Render(panel2Content)
 
 	// --- PANEL 3: VISTA / PASO A PASO (derecha) ---
+	panel3Content := clipLines(
+		m.panel3Header(innerR)+m.output.View(),
+		m.rightHeight()-panelBorder-outputPadY,
+	)
 	panel3 := outputPanelStyle.
-		Width(rw - chromeOutW).
-		Height(m.rightHeight() - chromeOutH).
-		Render(m.panel3Header(innerR) + m.output.View())
+		Width(rw - panelBorder).
+		Height(m.rightHeight() - panelBorder).
+		Render(panel3Content)
 
 	// --- ENSAMBLADO DE LA CUADRÍCULA ---
 	leftColumn := lipgloss.JoinVertical(lipgloss.Top, panel1, panel2)
@@ -94,7 +101,7 @@ func (m *Model) declEchoLine() string {
 	if raw == "" {
 		return ""
 	}
-	innerL := m.leftWidth() - chromeInW - chromeInW
+	innerL := m.leftWidth() - panelBorder - inputPadX
 	d, err := engine.ParseDecl(raw)
 	if err != nil {
 		return "\n\n" + levelErrorStyle.Render(clampWidth("✗ "+err.Error(), innerL-2))

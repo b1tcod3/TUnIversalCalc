@@ -259,7 +259,7 @@ func (m *Model) completionView() string {
 	if !c.Open || len(c.Items) == 0 {
 		return ""
 	}
-	innerW := m.leftWidth() - chromeInW - chromeInW
+	innerW := m.leftWidth() - panelBorder - inputPadX
 	from := max(c.Off, 0)
 	to := min(from+c.Max, len(c.Items))
 	var lines []string
