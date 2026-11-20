@@ -279,6 +279,96 @@ func TestNewtonObjetoExplicito(t *testing.T) {
 	}
 }
 
+func TestPotenciaYRadicalFlujo(t *testing.T) {
+	m := newFlowModel()
+
+	m.declInput.SetValue("/expresion (3a^3b^3)(4ab^2)^2")
+	m.handleEnter()
+	m.cmdInput.SetValue("/potencia")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("potencia debe lanzar un comando")
+	}
+	res := mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("potencia falló: %v", res.Err)
+	}
+	if !strings.Contains(strings.Join(res.Steps, " "), "48*a^5*b^7") {
+		t.Fatalf("resultado de potencia ausente: %v", res.Steps)
+	}
+
+	m.switchPanel()
+	m.declInput.SetValue("/expresion raiz(3, 16)")
+	m.handleEnter()
+	if d, ok := m.objs["p2"]; !ok || !strings.Contains(d.Latex, `\sqrt[3]{16}`) || d.Pretty != "∛16" {
+		t.Fatalf("raiz no renderizada correctamente: %+v", d)
+	}
+	m.cmdInput.SetValue("/radical")
+	cmd = m.handleEnter()
+	if cmd == nil {
+		t.Fatal("radical debe lanzar un comando")
+	}
+	res = mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("radical falló: %v", res.Err)
+	}
+	if !strings.Contains(strings.Join(res.Steps, " "), "2*raiz(3, 2)") {
+		t.Fatalf("resultado de radical ausente: %v", res.Steps)
+	}
+
+	m.switchPanel()
+	m.declInput.SetValue("/expresion alpha^2+2alpha")
+	m.handleEnter()
+	m.cmdInput.SetValue("/potencia")
+	cmd = m.handleEnter()
+	if cmd == nil {
+		t.Fatal("potencia con variable larga debe lanzar un comando")
+	}
+	res = mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("potencia con alpha falló: %v", res.Err)
+	}
+	if !strings.Contains(strings.Join(res.Steps, " "), "alpha^2 + 2*alpha") {
+		t.Fatalf("resultado con variable larga ausente: %v", res.Steps)
+	}
+}
+
+func TestDesarrollarFlujo(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/expresion (a+b)^2")
+	m.handleEnter()
+	m.cmdInput.SetValue("/desarrollar")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("desarrollar debe lanzar un comando")
+	}
+	res := mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("desarrollar falló: %v", res.Err)
+	}
+	all := strings.Join(res.Steps, " ")
+	for _, frag := range []string{"cuadrado de un binomio", "a^2 + 2*a*b + b^2"} {
+		if !strings.Contains(all, frag) {
+			t.Fatalf("falta %q en: %v", frag, res.Steps)
+		}
+	}
+}
+
+func TestVariablesDeVariasLetras(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/funcion alpha^2+2alpha")
+	m.handleEnter()
+	m.cmdInput.SetValue("/lagrange ALPHA")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("lagrange alpha debe resolverse y llegar al motor")
+	}
+	res := mustResultMsg(t, cmd)
+	if res.Err == nil || !strings.Contains(res.Err.Error(), "puntos") {
+		t.Fatalf("se esperaba el error de lagrange sobre función: %+v", res)
+	}
+}
+
 func TestResolverErrores(t *testing.T) {
 	m := newFlowModel()
 	declararEcuacionYFuncion(t, &m)
@@ -378,6 +468,46 @@ func TestExpresionDecimalNoAutoFactoriza(t *testing.T) {
 	}
 	if _, ok := m.objs["p1"]; !ok {
 		t.Fatalf("p1 no declarada: %+v", m.objs)
+	}
+}
+
+func TestFactorizarPolinomioFlujo(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/expresion x^2-4")
+	m.handleEnter()
+	m.cmdInput.SetValue("/factorizar p1")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("debe lanzarse la factorización del polinomio")
+	}
+	res := mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("factorizar polinomio falló: %v", res.Err)
+	}
+	if !strings.Contains(strings.Join(res.Steps, " "), "(x - 2)*(x + 2)") {
+		t.Fatalf("factorización ausente: %v", res.Steps)
+	}
+}
+
+func TestFactorizarRacionalFlujo(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/expresion (x^2+3x+2)/(x^2-x-2)")
+	m.handleEnter()
+	m.cmdInput.SetValue("/factorizar p1")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("debe lanzarse la factorización de la expresión racional")
+	}
+	res := mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("factorizar expresión racional falló: %v", res.Err)
+	}
+	all := strings.Join(res.Steps, " ")
+	if !strings.Contains(all, "Factorización: (x + 2)/(x - 2)") {
+		t.Fatalf("resultado racional ausente: %v", res.Steps)
+	}
+	if !strings.Contains(all, "Factorización del denominador:") {
+		t.Fatalf("factorización del denominador ausente: %v", res.Steps)
 	}
 }
 

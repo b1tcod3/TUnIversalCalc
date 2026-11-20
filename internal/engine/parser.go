@@ -3,6 +3,7 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -117,7 +118,7 @@ func (p *parser) parseExpr(minBp int) (Expr, error) {
 				return nil, err
 			}
 			left = Mul{Factors: []Expr{left, rhs}}
-		case TokRParen, TokEq, TokEOF:
+		case TokRParen, TokComma, TokEq, TokEOF:
 			return left, nil
 		default:
 			return nil, fmt.Errorf("token inesperado %q (posición %d)", t.Text, t.Pos)
@@ -133,7 +134,7 @@ func (p *parser) parseNud() (Expr, error) {
 	case TokNum:
 		return Num{Text: t.Text}, nil
 	case TokVar:
-		return Var{Name: t.Text[0]}, nil
+		return Var{Name: t.Text}, nil
 	case TokConst:
 		return Const{Name: t.Text}, nil
 	case TokFunc:
@@ -151,6 +152,8 @@ func (p *parser) parseNud() (Expr, error) {
 		return p.parseGroup()
 	case TokRParen:
 		return nil, fmt.Errorf("')' sobrante (posición %d)", t.Pos)
+	case TokComma:
+		return nil, fmt.Errorf("',' inesperada (posición %d)", t.Pos)
 	case TokEq:
 		return nil, fmt.Errorf("se esperaba una expresión antes de '=' (posición %d)", t.Pos)
 	default:
@@ -164,6 +167,9 @@ func (p *parser) parseFuncCall(t Token) (Expr, error) {
 		return nil, fmt.Errorf("se esperaba '(' tras %s (posición %d)", t.Text, t.Pos)
 	}
 	p.next()
+	if t.Text == fnRaiz {
+		return p.parseRaizCall(t)
+	}
 	arg, err := p.parseExpr(0)
 	if err != nil {
 		return nil, err
@@ -174,6 +180,76 @@ func (p *parser) parseFuncCall(t Token) (Expr, error) {
 	}
 	p.next()
 	return Call{Name: t.Text, Arg: arg}, nil
+}
+
+// parseRaizCall interpreta raiz(n, expr) como una potencia con exponente
+// racional. Para índice 2 reutiliza sqrt(expr), de modo que el resto del
+// motor simbólico no necesita un nodo nuevo.
+func (p *parser) parseRaizCall(t Token) (Expr, error) {
+	first, err := p.parseExpr(0)
+	if err != nil {
+		return nil, err
+	}
+	// raiz(x) es la raíz cuadrada; raiz(n, x) es la raíz n-ésima.
+	if p.peek().Kind == TokRParen {
+		p.next()
+		return makeRoot(first, 2)
+	}
+	if p.peek().Kind != TokComma {
+		return nil, fmt.Errorf("raiz necesita raiz(x) o raiz(n, x) (posición %d)", t.Pos)
+	}
+	p.next() // consume ','
+	rad, err := p.parseExpr(0)
+	if err != nil {
+		return nil, err
+	}
+	closing := p.peek()
+	if closing.Kind != TokRParen {
+		return nil, fmt.Errorf("se esperaba ')' tras el radicando de raiz (posición %d)", closing.Pos)
+	}
+	p.next()
+
+	n, ok := positiveIntLiteral(first)
+	if !ok {
+		return nil, fmt.Errorf("el índice de raiz debe ser un entero positivo (posición %d)", t.Pos)
+	}
+	if n == 1 {
+		return rad, nil
+	}
+	return makeRoot(rad, n)
+}
+
+// positiveIntLiteral extrae un entero positivo de un literal Num.
+func positiveIntLiteral(e Expr) (int, bool) {
+	num, ok := e.(Num)
+	if !ok || strings.ContainsAny(num.Text, "./") {
+		return 0, false
+	}
+	n, err := strconv.Atoi(num.Text)
+	if err != nil || n < 1 {
+		return 0, false
+	}
+	return n, true
+}
+
+// makeRoot convierte raiz(n, x) en sqrt(x) o x^(1/n), sacando el signo
+// cuando el índice es impar. Un índice par con radicando negativo se
+// rechaza porque el resultado no es real.
+func makeRoot(rad Expr, n int) (Expr, error) {
+	if neg, ok := rad.(Neg); ok {
+		if n%2 == 0 {
+			return nil, errors.New("raíz de índice par de una cantidad negativa: los complejos no están soportados")
+		}
+		inner, err := makeRoot(neg.X, n)
+		if err != nil {
+			return nil, err
+		}
+		return Neg{X: inner}, nil
+	}
+	if n == 2 {
+		return Call{Name: fnSqrt, Arg: rad}, nil
+	}
+	return Pow{Base: rad, Exp: Num{Text: "1/" + strconv.Itoa(n)}}, nil
 }
 
 // parseGroup consume (expr) y devuelve la expresión interior.

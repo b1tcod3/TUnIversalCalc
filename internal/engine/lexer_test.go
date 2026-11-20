@@ -47,9 +47,52 @@ func TestLexConstantsAndFunctions(t *testing.T) {
 }
 
 func TestLexErrors(t *testing.T) {
-	for _, in := range []string{"a@b", "xx*2", "1.2.3", "xyz", "ln(x)"} {
+	for _, in := range []string{"a@b", "1.2.3", "ln(x)", "foo(x)"} {
 		if _, err := lex(in); err == nil {
 			t.Errorf("lex(%q) debe fallar", in)
+		}
+	}
+}
+
+func TestLexMultiLetterVars(t *testing.T) {
+	toks, err := lex("2alpha+beta gamma")
+	if err != nil {
+		t.Fatalf("lex: %v", err)
+	}
+	var got []string
+	for _, tk := range toks {
+		if tk.Kind != TokEOF {
+			got = append(got, tk.Text)
+		}
+	}
+	want := []string{"2", "alpha", "+", "beta", "gamma"}
+	if len(got) != len(want) {
+		t.Fatalf("tokens = %v, se esperaba %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("token %d = %q, se esperaba %q", i, got[i], want[i])
+		}
+	}
+
+	// Dos letras siguen siendo un producto implícito para no romper 4ab^2.
+	toks, err = lex("4ab^2")
+	if err != nil {
+		t.Fatalf("lex: %v", err)
+	}
+	got = got[:0]
+	for _, tk := range toks {
+		if tk.Kind != TokEOF {
+			got = append(got, tk.Text)
+		}
+	}
+	want = []string{"4", "a", "b", "^", "2"}
+	if len(got) != len(want) {
+		t.Fatalf("tokens = %v, se esperaba %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("token %d = %q, se esperaba %q", i, got[i], want[i])
 		}
 	}
 }

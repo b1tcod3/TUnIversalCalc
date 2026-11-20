@@ -63,7 +63,7 @@ func TestDerive(t *testing.T) {
 		{"-x^2", "-2*x"},
 	}
 	for _, c := range cases {
-		r, steps, err := Derive(mustParse(t, c.in), 'x')
+		r, steps, err := Derive(mustParse(t, c.in), "x")
 		if err != nil {
 			t.Fatalf("Derive(%q): %v", c.in, err)
 		}
@@ -77,7 +77,7 @@ func TestDerive(t *testing.T) {
 }
 
 func TestDeriveChainRuleSteps(t *testing.T) {
-	r, steps, err := Derive(mustParse(t, "sin(x^2)"), 'x')
+	r, steps, err := Derive(mustParse(t, "sin(x^2)"), "x")
 	if err != nil {
 		t.Fatalf("Derive: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestDeriveChainRuleSteps(t *testing.T) {
 }
 
 func TestDeriveOtherVar(t *testing.T) {
-	r, _, err := Derive(mustParse(t, "y^2+5"), 'x')
+	r, _, err := Derive(mustParse(t, "y^2+5"), "x")
 	if err != nil {
 		t.Fatalf("Derive: %v", err)
 	}
@@ -105,13 +105,13 @@ func TestDeriveOtherVar(t *testing.T) {
 }
 
 func TestDeriveUnsupported(t *testing.T) {
-	if _, _, err := Derive(mustParse(t, "x^x"), 'x'); err == nil {
+	if _, _, err := Derive(mustParse(t, "x^x"), "x"); err == nil {
 		t.Fatal("x^x debe dar error")
 	}
 }
 
 func TestSolveLinear(t *testing.T) {
-	steps, err := Solve(mustParse(t, "2x+2"), nil, 'x')
+	steps, err := Solve(mustParse(t, "2x+2"), nil, "x")
 	if err != nil {
 		t.Fatalf("Solve(2x+2): %v", err)
 	}
@@ -120,7 +120,7 @@ func TestSolveLinear(t *testing.T) {
 		t.Fatalf("solución esperada x = -1, pasos: %v", steps)
 	}
 
-	steps, err = Solve(mustParse(t, "3x-6"), nil, 'x')
+	steps, err = Solve(mustParse(t, "3x-6"), nil, "x")
 	if err != nil {
 		t.Fatalf("Solve(3x-6): %v", err)
 	}
@@ -131,7 +131,7 @@ func TestSolveLinear(t *testing.T) {
 
 func TestSolveEquationLHSRHS(t *testing.T) {
 	lhs, rhs := mustParse(t, "x+1"), mustParse(t, "2x-3")
-	steps, err := Solve(lhs, rhs, 'x')
+	steps, err := Solve(lhs, rhs, "x")
 	if err != nil {
 		t.Fatalf("Solve(x+1=2x-3): %v", err)
 	}
@@ -146,7 +146,7 @@ func TestSolveEquationLHSRHS(t *testing.T) {
 }
 
 func TestSolveQuadratic(t *testing.T) {
-	steps, err := Solve(mustParse(t, "x^2-4"), nil, 'x')
+	steps, err := Solve(mustParse(t, "x^2-4"), nil, "x")
 	if err != nil {
 		t.Fatalf("Solve(x^2-4): %v", err)
 	}
@@ -159,7 +159,7 @@ func TestSolveQuadratic(t *testing.T) {
 		t.Fatalf("raíces esperadas ±2:\n%s", all)
 	}
 
-	steps, err = Solve(mustParse(t, "x^2+1"), nil, 'x')
+	steps, err = Solve(mustParse(t, "x^2+1"), nil, "x")
 	if err != nil {
 		t.Fatalf("Solve(x^2+1): %v", err)
 	}
@@ -169,14 +169,14 @@ func TestSolveQuadratic(t *testing.T) {
 }
 
 func TestSolveNoVariable(t *testing.T) {
-	if _, err := Solve(mustParse(t, "2+2"), nil, 'x'); err == nil {
+	if _, err := Solve(mustParse(t, "2+2"), nil, "x"); err == nil {
 		t.Fatal("sin la variable x debe dar error")
 	}
 }
 
 func TestSolveIdentityAndContradiction(t *testing.T) {
 	// 0 = 0 (caso simplificado a 0)
-	steps, err := Solve(mustParse(t, "x-x"), nil, 'x')
+	steps, err := Solve(mustParse(t, "x-x"), nil, "x")
 	if err != nil {
 		t.Fatalf("Solve(x-x): %v", err)
 	}
@@ -185,7 +185,7 @@ func TestSolveIdentityAndContradiction(t *testing.T) {
 		t.Fatalf("x=x debe ser identidad: %v", steps)
 	}
 	// 2 = 0 → contradicción: error
-	if _, err := Solve(mustParse(t, "x-x+2"), nil, 'x'); err == nil {
+	if _, err := Solve(mustParse(t, "x-x+2"), nil, "x"); err == nil {
 		t.Fatal("2=0 debe ser contradicción (error)")
 	}
 }
@@ -202,7 +202,7 @@ func TestIntegrate(t *testing.T) {
 		{"2", "2*x"},
 	}
 	for _, c := range cases {
-		r, _, err := Integrate(mustParse(t, c.in), 'x')
+		r, _, err := Integrate(mustParse(t, c.in), "x")
 		if err != nil {
 			t.Fatalf("Integrate(%q): %v", c.in, err)
 		}
@@ -213,10 +213,10 @@ func TestIntegrate(t *testing.T) {
 }
 
 func TestIntegrateUnsupported(t *testing.T) {
-	if _, _, err := Integrate(mustParse(t, "x*sin(x)"), 'x'); err == nil {
+	if _, _, err := Integrate(mustParse(t, "x*sin(x)"), "x"); err == nil {
 		t.Fatal("x·sin(x) debe dar error (necesita partes)")
 	}
-	if _, _, err := Integrate(mustParse(t, "abs(x)"), 'x'); err == nil {
+	if _, _, err := Integrate(mustParse(t, "abs(x)"), "x"); err == nil {
 		t.Fatal("abs(x) debe dar error")
 	}
 }
@@ -243,7 +243,7 @@ func TestLimitSubstitution(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			r, _, err := Limit(mustParse(t, c.in), 'x', c.val)
+			r, _, err := Limit(mustParse(t, c.in), "x", c.val)
 			if err != nil {
 				t.Fatalf("Limit(%q, %v): %v", c.in, c.val, err)
 			}
@@ -294,8 +294,8 @@ func TestMergeMulBasesNumInvalido(t *testing.T) {
 }
 
 func TestLHopitalSinDerivada(t *testing.T) {
-	e := Call{Name: "tan", Arg: Var{Name: 'x'}}
-	got := lHopital(e, 'x')
+	e := Call{Name: "tan", Arg: Var{Name: "x"}}
+	got := lHopital(e, "x")
 	if got == nil {
 		t.Fatal("lHopital no debe devolver nil si la derivada falla")
 	}
@@ -305,20 +305,20 @@ func TestLHopitalSinDerivada(t *testing.T) {
 }
 
 func TestLimitUnsupported(t *testing.T) {
-	if _, _, err := Limit(mustParse(t, "sin(x)/x"), 'x', Value{IsInf: true, Sign: 1}); err == nil {
+	if _, _, err := Limit(mustParse(t, "sin(x)/x"), "x", Value{IsInf: true, Sign: 1}); err == nil {
 		t.Fatal("sin(x)/x en ∞ debe dar error (no polinómico)")
 	}
 }
 
 func TestNumEval(t *testing.T) {
-	v, err := numEval(mustParse(t, "2x^2+1"), 'x', 3)
+	v, err := numEval(mustParse(t, "2x^2+1"), "x", 3)
 	if err != nil {
 		t.Fatalf("numEval: %v", err)
 	}
 	if v != 19 {
 		t.Fatalf("2·3²+1 = %v, se esperaba 19", v)
 	}
-	if _, err := numEval(mustParse(t, "y^2"), 'x', 1); err == nil {
+	if _, err := numEval(mustParse(t, "y^2"), "x", 1); err == nil {
 		t.Fatal("y sin sustituir debe dar error")
 	}
 }

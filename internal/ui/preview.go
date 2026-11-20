@@ -92,9 +92,19 @@ func (m *Model) clearPreview() {
 // previewTarget es como resolveTarget pero sin escribir en el log: se usa
 // mientras el usuario escribe y todavía puede haber un comando incompleto.
 func (m *Model) previewTarget(command string) (engine.Decl, string, bool) {
+	if isClearCommand(command) {
+		return engine.Decl{}, "", false
+	}
 	toks := splitCommandTokens(normalizeCommandArgs(command))
 	if d, ok := m.literalIntegerDecl(command); ok {
 		return d, "x", true
+	}
+	if len(toks) > 0 && isObjectOnlyCommand(toks[0]) {
+		decl, err := m.resolveObjectTarget(toks)
+		if err != nil {
+			return engine.Decl{}, "", false
+		}
+		return decl, "x", true
 	}
 	decl, varName, err := m.resolveTargetTokens(toks)
 	if err != nil {

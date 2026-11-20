@@ -17,6 +17,7 @@ const (
 	TokOp    // + - * / ^
 	TokLParen
 	TokRParen
+	TokComma
 	TokEq
 )
 
@@ -33,24 +34,33 @@ const (
 	fnSin  = "sin"
 	fnCos  = "cos"
 	fnAbs  = "abs"
+	fnRaiz = "raiz"
 )
 
 // funciones y constantes reconocidas (todas en minúsculas).
 var funcs = map[string]bool{
-	fnSqrt: true, fnSin: true, fnCos: true, fnAbs: true,
+	fnSqrt: true, fnSin: true, fnCos: true, fnAbs: true, fnRaiz: true,
 }
 
 var consts = map[string]bool{
 	"pi": true, "inf": true,
 }
 
-// lex convierte la expresión en tokens. Las comas y espacios se ignoran.
+// Funciones que el usuario puede intentar usar pero que el motor todavía no
+// soporta. Evitan que ln(x), log(x), etc. se interpreten como productos.
+var unsupportedFuncs = map[string]bool{
+	"ln": true, "log": true, "tan": true, "exp": true,
+	"sec": true, "csc": true, "cot": true,
+}
+
+// lex convierte la expresión en tokens. Los espacios se ignoran; las comas
+// se conservan para separar los argumentos de raiz(n, expr).
 func lex(src string) ([]Token, error) {
 	var toks []Token
 	for i := 0; i < len(src); {
 		c := src[i]
 		switch {
-		case c == ' ' || c == ',':
+		case c == ' ':
 			i++
 		case isDigit(c) || c == '.':
 			tok, next, err := lexNumber(src, i)
@@ -64,7 +74,18 @@ func lex(src string) ([]Token, error) {
 			if err != nil {
 				return nil, err
 			}
-			toks = append(toks, tok)
+			// Dos letras sueltas siguen siendo multiplicación implícita
+			// (ab = a*b). Los nombres de tres o más letras son variables
+			// completas (alpha, beta, tasa).
+			if tok.Kind == TokVar && len(tok.Text) == 2 &&
+				isLetter(tok.Text[0]) && isLetter(tok.Text[1]) {
+				toks = append(toks,
+					Token{Kind: TokVar, Text: tok.Text[:1], Pos: i},
+					Token{Kind: TokVar, Text: tok.Text[1:], Pos: i + 1},
+				)
+			} else {
+				toks = append(toks, tok)
+			}
 			i = next
 		default:
 			tok, ok := lexSymbol(c, i)
@@ -98,8 +119,8 @@ func lexNumber(src string, start int) (Token, int, error) {
 	return Token{Kind: TokNum, Text: text, Pos: start}, i, nil
 }
 
-// lexIdent escanea un identificador y lo clasifica: constante, función o
-// variable de una letra.
+// lexIdent escanea un identificador y lo clasifica: constante, función,
+// variable o nombre de variable de varias letras.
 func lexIdent(src string, start int) (Token, int, error) {
 	i := start + 1
 	for i < len(src) && (isLetter(src[i]) || isDigit(src[i])) {
@@ -111,12 +132,19 @@ func lexIdent(src string, start int) (Token, int, error) {
 		return Token{Kind: TokConst, Text: ident, Pos: start}, i, nil
 	case funcs[ident]:
 		return Token{Kind: TokFunc, Text: ident, Pos: start}, i, nil
-	case len(ident) == 1:
-		return Token{Kind: TokVar, Text: ident, Pos: start}, i, nil
 	default:
-		return Token{}, 0, fmt.Errorf(
-			"identificador %q no reconocido (posición %d) — usa variables de una letra, pi, inf o sqrt/sin/cos/abs",
-			ident, start)
+		// Un identificador de tres o más letras seguido de '(' se interpreta
+		// como una función desconocida (foo(x)). Los de dos letras se parten
+		// después en dos variables (ab(x) = a*b*(x)), salvo funciones
+		// conocidas pero no soportadas como ln(x).
+		if i < len(src) && src[i] == '(' {
+			if len(ident) > 2 || unsupportedFuncs[ident] {
+				return Token{}, 0, fmt.Errorf(
+					"función %q no reconocida (posición %d) — usa sqrt, sin, cos, abs o raiz",
+					ident, start)
+			}
+		}
+		return Token{Kind: TokVar, Text: ident, Pos: start}, i, nil
 	}
 }
 
@@ -129,6 +157,8 @@ func lexSymbol(c byte, pos int) (Token, bool) {
 		return Token{Kind: TokLParen, Text: "(", Pos: pos}, true
 	case ')':
 		return Token{Kind: TokRParen, Text: ")", Pos: pos}, true
+	case ',':
+		return Token{Kind: TokComma, Text: ",", Pos: pos}, true
 	case '=':
 		return Token{Kind: TokEq, Text: "=", Pos: pos}, true
 	}

@@ -34,11 +34,11 @@ func names(list []Template) []string {
 func TestBuildPalette(t *testing.T) {
 	// Fragmento vacío devuelve todo, en orden alfabético
 	decl := buildPalette(declRegistry, "")
-	if !reflect.DeepEqual(names(decl), []string{"ecuacion", "expresion", "funcion", "puntos"}) {
+	if !reflect.DeepEqual(names(decl), []string{"ecuacion", "expresion", "funcion", "limpiar", "puntos"}) {
 		t.Fatalf("declaraciones no alfabéticas: %v", names(decl))
 	}
 	ops := buildPalette(opsRegistry, "")
-	if !reflect.DeepEqual(names(ops), []string{"factorizar", "lagrange", "newton"}) {
+	if !reflect.DeepEqual(names(ops), []string{"desarrollar", "factorizar", "lagrange", "limpiar", "newton", "potencia", "radical"}) {
 		t.Fatalf("operaciones no alfabéticas: %v", names(ops))
 	}
 
@@ -52,8 +52,13 @@ func TestBuildPalette(t *testing.T) {
 		{declRegistry, "expre", []string{"expresion"}},
 		{declRegistry, "ecu", []string{"ecuacion"}},
 		{declRegistry, "punt", []string{"puntos"}},
+		{declRegistry, "lim", []string{"limpiar"}},
+		{opsRegistry, "des", []string{"desarrollar"}},
 		{opsRegistry, "lag", []string{"lagrange"}},
+		{opsRegistry, "lim", []string{"limpiar"}},
 		{opsRegistry, "newt", []string{"newton"}},
+		{opsRegistry, "pot", []string{"potencia"}},
+		{opsRegistry, "rad", []string{"radical"}},
 		{opsRegistry, "zzz", []string{}},
 	}
 	for _, c := range cases {
@@ -150,7 +155,7 @@ func TestPaletteAbreEnPanel1(t *testing.T) {
 	if !m.palette.Open {
 		t.Fatal("debe abrirse con '/'")
 	}
-	if !reflect.DeepEqual(names(m.palette.List), []string{"ecuacion", "expresion", "funcion", "puntos"}) {
+	if !reflect.DeepEqual(names(m.palette.List), []string{"ecuacion", "expresion", "funcion", "limpiar", "puntos"}) {
 		t.Fatalf("lista de declaraciones incorrecta: %v", names(m.palette.List))
 	}
 	if m.palette.Sel != 0 || m.palette.Anchor != FocusDecl {
@@ -192,13 +197,15 @@ func TestPaletteNavegacionClamp(t *testing.T) {
 	m.paletteDown()
 	m.paletteDown()
 	m.paletteDown()
-	if m.palette.Sel != 3 {
-		t.Fatalf("la selección debe quedarse en el último (3), quedó %d", m.palette.Sel)
+	m.paletteDown()
+	if m.palette.Sel != 4 {
+		t.Fatalf("la selección debe quedarse en el último (4), quedó %d", m.palette.Sel)
 	}
 	m.paletteUp()
-	if m.palette.Sel != 2 {
-		t.Fatalf("Shift+Tab debe subir a 2, quedó %d", m.palette.Sel)
+	if m.palette.Sel != 3 {
+		t.Fatalf("Shift+Tab debe subir a 3, quedó %d", m.palette.Sel)
 	}
+	m.paletteUp()
 	m.paletteUp()
 	m.paletteUp()
 	if m.palette.Sel != 0 {

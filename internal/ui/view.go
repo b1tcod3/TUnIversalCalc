@@ -11,6 +11,9 @@ import (
 
 //nolint:gocyclo // composición de los tres paneles en una sola pasada
 func (m *Model) View() string {
+	if m.clearConfirm {
+		return m.clearConfirmView()
+	}
 	if m.helpOpen {
 		return m.helpView()
 	}
@@ -87,7 +90,7 @@ func (m *Model) View() string {
 	leftColumn := lipgloss.JoinVertical(lipgloss.Top, panel1, panel2)
 	grid := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, panel3)
 
-	helpText := "[Tab] Panel • [Enter] Ejecutar • [Ctrl+O] Sesiones • " +
+	helpText := "[Tab] Panel • [Enter] Ejecutar • [Ctrl+O] Sesiones • [Ctrl+L] Limpiar • " +
 		"[Ctrl+Z/Y] Undo/Redo • [Ctrl+H] Ayuda • [Ctrl+S] Guardar • [Esc] Salir"
 	help := helpStyle.Render(clampWidth(helpText, m.width))
 
@@ -105,6 +108,10 @@ func (m *Model) declEchoLine() string {
 		return ""
 	}
 	innerL := m.leftWidth() - panelBorder - inputPadX
+	if isClearCommand(raw) {
+		return "\n\n" + levelInfoStyle.Render(clampWidth(
+			"/limpiar borra todo el espacio de trabajo (pide confirmación)", innerL-2))
+	}
 	d, err := engine.ParseDecl(raw)
 	if err != nil {
 		return "\n\n" + levelErrorStyle.Render(clampWidth("✗ "+err.Error(), innerL-2))

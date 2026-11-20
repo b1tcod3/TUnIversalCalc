@@ -361,7 +361,7 @@ func mergeMulBases(facts []Expr) (float64, []Expr) {
 
 // Derive calcula la derivada de e respecto a v con la regla de la cadena
 // y devuelve los pasos aplicados. El resultado está simplificado.
-func Derive(e Expr, v byte) (Expr, []string, error) {
+func Derive(e Expr, v string) (Expr, []string, error) {
 	d := &deriver{v: v}
 	res, err := d.derive(simplifyNormaliza(e))
 	if err != nil {
@@ -373,7 +373,7 @@ func Derive(e Expr, v byte) (Expr, []string, error) {
 }
 
 type deriver struct {
-	v     byte
+	v     string
 	steps []string
 }
 
@@ -384,11 +384,11 @@ func (d *deriver) rule(msg string) {
 func (d *deriver) derive(e Expr) (Expr, error) {
 	switch n := e.(type) {
 	case Num:
-		d.rule("d/d" + string(d.v) + " (constante " + n.Text + ") = 0")
+		d.rule("d/d" + d.v + " (constante " + n.Text + ") = 0")
 		return Num{Text: "0"}, nil
 	case Var:
 		if n.Name == d.v {
-			d.rule("d/d" + string(d.v) + " " + string(d.v) + " = 1")
+			d.rule("d/d" + d.v + " " + d.v + " = 1")
 			return Num{Text: "1"}, nil
 		}
 		return Num{Text: "0"}, nil
@@ -541,20 +541,20 @@ func Simplify(e Expr) (Expr, []string, error) {
 // Solve resuelve la ecuación lhs=rhs (o expr=0 con rhs nil) para la
 // variable v. Soporta polinomios de grado ≤ 2 con coeficientes numéricos
 // (la solución lineal admite constantes simbólicas).
-func Solve(lhs, rhs Expr, v byte) ([]string, error) {
+func Solve(lhs, rhs Expr, v string) ([]string, error) {
 	whole := lhs
 	if rhs != nil {
 		whole = Add{Terms: []Expr{lhs, Neg{X: rhs}}}
 	}
 	if !isVarIn(whole, v) {
-		return nil, fmt.Errorf("la expresión no contiene la variable %q", string(v))
+		return nil, fmt.Errorf("la expresión no contiene la variable %q", v)
 	}
 	whole = simplifyNormaliza(whole)
 
 	var steps []string
 	steps = append(steps,
 		"Igualando a cero: "+whole.Ascii(),
-		"Extrayendo los coeficientes de "+string(v)+" ...")
+		"Extrayendo los coeficientes de "+v+" ...")
 
 	coeffs := map[int]float64{}
 	for _, t := range collectTerms(whole) {
@@ -563,7 +563,7 @@ func Solve(lhs, rhs Expr, v byte) ([]string, error) {
 			return nil, fmt.Errorf(
 				"término %q depende de %q de forma no polinómica: sin soporte analítico",
 				termKey(t),
-				string(v),
+				v,
 			)
 		}
 		coeffs[deg] += t.coeff
@@ -573,8 +573,8 @@ func Solve(lhs, rhs Expr, v byte) ([]string, error) {
 
 	switch {
 	case a != 0:
-		eq := "Ecuación cuadrática: " + formatNum(a) + "·" + string(v) + "² + " +
-			formatNum(b) + "·" + string(v) + " + " + formatNum(c) + " = 0"
+		eq := "Ecuación cuadrática: " + formatNum(a) + "·" + v + "² + " +
+			formatNum(b) + "·" + v + " + " + formatNum(c) + " = 0"
 		steps = append(steps, eq)
 		disc := b*b - 4*a*c
 		steps = append(steps, "Discriminante Δ = b² − 4ac = "+formatNum(disc))
@@ -586,30 +586,30 @@ func Solve(lhs, rhs Expr, v byte) ([]string, error) {
 		x1 := (-b + sd) / (2 * a)
 		x2 := (-b - sd) / (2 * a)
 		if math.Abs(x1-x2) < 1e-12 {
-			steps = append(steps, "Raíz doble: "+string(v)+" = "+formatNum(x1))
+			steps = append(steps, "Raíz doble: "+v+" = "+formatNum(x1))
 			return steps, nil
 		}
 		steps = append(steps,
-			string(v)+" = "+formatNum(x1),
-			string(v)+" = "+formatNum(x2))
+			v+" = "+formatNum(x1),
+			v+" = "+formatNum(x2))
 		return steps, nil
 
 	case b == 0:
 		if c == 0 {
-			steps = append(steps, "Identidad: cualquier "+string(v)+" es solución")
+			steps = append(steps, "Identidad: cualquier "+v+" es solución")
 			return steps, nil
 		}
 		return nil, fmt.Errorf("ecuación sin solución: %g = 0 es falso", c)
 
 	default:
 		cExpr := constTermExpr(whole, v)
-		steps = append(steps, "Ecuación lineal: "+formatNum(b)+"·"+string(v)+" + "+cExprAscii(cExpr)+" = 0")
+		steps = append(steps, "Ecuación lineal: "+formatNum(b)+"·"+v+" + "+cExprAscii(cExpr)+" = 0")
 		if ce, ok := matchNum(cExpr); ok {
-			steps = append(steps, "Despejando: "+string(v)+" = "+formatNum(-ce/b))
+			steps = append(steps, "Despejando: "+v+" = "+formatNum(-ce/b))
 			return steps, nil
 		}
 		sol := simplifyNormaliza(Div{Num: Neg{X: cExpr}, Den: Num{Text: NumFromFloat(b).Text}})
-		steps = append(steps, "Despejando: "+string(v)+" = "+sol.Ascii())
+		steps = append(steps, "Despejando: "+v+" = "+sol.Ascii())
 		return steps, nil
 	}
 }
@@ -617,7 +617,7 @@ func Solve(lhs, rhs Expr, v byte) ([]string, error) {
 // termDegree devuelve el grado del término respecto a v:
 //
 //	0 para constantes, 1 para v, 2 para v^2 y -1 si no es polinómico.
-func termDegree(rest Expr, v byte) int {
+func termDegree(rest Expr, v string) int {
 	if rest == nil {
 		return 0
 	}
@@ -659,7 +659,7 @@ func termDegree(rest Expr, v byte) int {
 
 // constTermExpr devuelve la expresión de los términos constantes respecto
 // a v (útil para soluciones lineales con constantes simbólicas).
-func constTermExpr(e Expr, v byte) Expr {
+func constTermExpr(e Expr, v string) Expr {
 	var consts []Expr
 	for _, t := range collectTerms(e) {
 		if termDegree(t.rest, v) == 0 {
@@ -689,14 +689,14 @@ func cExprAscii(e Expr) string {
 
 // Integrate calcula la antiderivada término a término para polinomios y
 // las formas básicas sin(x), cos(x) y sqrt(x). El resto devuelve error.
-func Integrate(e Expr, v byte) (Expr, []string, error) {
+func Integrate(e Expr, v string) (Expr, []string, error) {
 	e = simplifyNormaliza(e)
 	vars := varList(e)
 	other := ""
 	var otherSb strings.Builder
 	for _, vv := range vars {
 		if vv != v {
-			otherSb.WriteString(string(vv))
+			otherSb.WriteString(vv)
 		}
 	}
 	other += otherSb.String()
@@ -722,7 +722,7 @@ func Integrate(e Expr, v byte) (Expr, []string, error) {
 }
 
 // integrateTerm integra un término coeff·rest respecto a v.
-func integrateTerm(t symTerm, v byte) (symTerm, bool) {
+func integrateTerm(t symTerm, v string) (symTerm, bool) {
 	if t.rest == nil {
 		return symTerm{coeff: t.coeff, rest: Var{Name: v}}, true
 	}
@@ -740,7 +740,7 @@ func integrateTerm(t symTerm, v byte) (symTerm, bool) {
 }
 
 // integrateVar integra c·x o c (variable distinta): ∫c·y dv = c·y·v.
-func integrateVar(c float64, n Var, v byte) (symTerm, bool) {
+func integrateVar(c float64, n Var, v string) (symTerm, bool) {
 	if n.Name == v {
 		// ∫ c·v dv = c·v²/2
 		return symTerm{coeff: c / 2, rest: Pow{Base: Var{Name: v}, Exp: Num{Text: "2"}}}, true
@@ -750,7 +750,7 @@ func integrateVar(c float64, n Var, v byte) (symTerm, bool) {
 
 // integrateDiv integra cocientes: 1/(polinomio en v) se reescribe como
 // potencia negativa y ∫ c/v dv = c·ln|v|.
-func integrateDiv(t symTerm, n Div, v byte) (symTerm, bool) {
+func integrateDiv(t symTerm, n Div, v string) (symTerm, bool) {
 	c := t.coeff
 	if nf, ok := matchNum(n.Num); ok {
 		lead, deg, okd := asyDegree(n.Den, v)
@@ -772,7 +772,7 @@ func integrateDiv(t symTerm, n Div, v byte) (symTerm, bool) {
 
 // integratePotencia aplica la regla de la potencia a c·v^e, con casos
 // especiales para e=−1 (logaritmo) y e=0.5 (raíz).
-func integratePow(t symTerm, n Pow, v byte) (symTerm, bool) {
+func integratePow(t symTerm, n Pow, v string) (symTerm, bool) {
 	vn, ok := n.Base.(Var)
 	if !ok || vn.Name != v {
 		return symTerm{}, false
@@ -800,7 +800,7 @@ func integratePow(t symTerm, n Pow, v byte) (symTerm, bool) {
 }
 
 // integrateCall integra sin(v) y cos(v) con argumento exacto v.
-func integrateCall(c float64, n Call, v byte) (symTerm, bool) {
+func integrateCall(c float64, n Call, v string) (symTerm, bool) {
 	vn, ok := n.Arg.(Var)
 	if !ok || vn.Name != v {
 		return symTerm{}, false
@@ -820,12 +820,12 @@ func integrateCall(c float64, n Call, v byte) (symTerm, bool) {
 
 // Limit calcula el límite de e cuando v → a por sustitución directa;
 // si resulta indeterminado intenta L'Hôpital (hasta 2 derivadas).
-func Limit(e Expr, v byte, a Value) (Expr, []string, error) {
+func Limit(e Expr, v string, a Value) (Expr, []string, error) {
 	e = simplifyNormaliza(e)
 	if !isVarIn(e, v) {
-		return e, []string{"La expresión no depende de " + string(v) + ": el límite es la propia expresión"}, nil
+		return e, []string{"La expresión no depende de " + v + ": el límite es la propia expresión"}, nil
 	}
-	steps := []string{"Sustituyendo " + string(v) + " → " + a.String() + " ..."}
+	steps := []string{"Sustituyendo " + v + " → " + a.String() + " ..."}
 
 	if a.IsInf {
 		return limitInf(e, v, a.Sign, steps)
@@ -851,7 +851,7 @@ func Limit(e Expr, v byte, a Value) (Expr, []string, error) {
 // lHopital aplica un paso de la regla de L'Hôpital: si f es un cociente
 // deriva numerador y denominador por separado (más fiable que la regla del
 // cociente completa); en cualquier otro caso deriva la expresión entera.
-func lHopital(f Expr, v byte) Expr {
+func lHopital(f Expr, v string) Expr {
 	if d, ok := f.(Div); ok {
 		dn, _, errn := Derive(d.Num, v)
 		if errn == nil {
@@ -888,8 +888,8 @@ func (v Value) String() string {
 }
 
 // limitInf evalúa el límite en ±∞ con la asintótica del término dominante.
-func limitInf(e Expr, v byte, sign int, steps []string) (Expr, []string, error) {
-	steps = append(steps, "Dominando por el término de mayor grado en "+string(v)+" ...")
+func limitInf(e Expr, v string, sign int, steps []string) (Expr, []string, error) {
+	steps = append(steps, "Dominando por el término de mayor grado en "+v+" ...")
 	lead, deg, ok := asyDegree(e, v)
 	if !ok {
 		return nil, nil, errors.New("límite en ∞ con funciones no polinómicas: sin soportar aún")
@@ -912,7 +912,7 @@ func limitInf(e Expr, v byte, sign int, steps []string) (Expr, []string, error) 
 }
 
 // asyDegree estima el comportamiento asintótico de e en ±∞: f ~ lead·v^deg.
-func asyDegree(e Expr, v byte) (lead float64, deg int, ok bool) {
+func asyDegree(e Expr, v string) (lead float64, deg int, ok bool) {
 	switch n := e.(type) {
 	case Num:
 		f, err := n.Float()
@@ -950,7 +950,7 @@ func asyDegree(e Expr, v byte) (lead float64, deg int, ok bool) {
 }
 
 // asyDegreeAdd toma el término dominante (mayor grado) de la suma.
-func asyDegreeAdd(n Add, v byte) (float64, int, bool) {
+func asyDegreeAdd(n Add, v string) (float64, int, bool) {
 	bestL, bestD := 0.0, math.MinInt
 	for _, t := range n.Terms {
 		l, d, o := asyDegree(t, v)
@@ -965,7 +965,7 @@ func asyDegreeAdd(n Add, v byte) (float64, int, bool) {
 }
 
 // asyDegreeMul multiplica coeficientes y suma grados de los factores.
-func asyDegreeMul(n Mul, v byte) (float64, int, bool) {
+func asyDegreeMul(n Mul, v string) (float64, int, bool) {
 	lead, deg := 1.0, 0
 	for _, f := range n.Factors {
 		l, d, o := asyDegree(f, v)
@@ -980,7 +980,7 @@ func asyDegreeMul(n Mul, v byte) (float64, int, bool) {
 
 // asyDegreePow estima v^e con exponente numérico; el resto no es
 // polinómico y no se soporta.
-func asyDegreePow(n Pow, v byte) (float64, int, bool) {
+func asyDegreePow(n Pow, v string) (float64, int, bool) {
 	if b, ok := n.Base.(Var); ok && b.Name == v {
 		if ef, err := numEval(n.Exp, v, 0); err == nil {
 			return 1, int(ef), true
@@ -995,7 +995,7 @@ func asyDegreePow(n Pow, v byte) (float64, int, bool) {
 }
 
 // numEval evalúa numéricamente la expresión sustituyendo v por a.
-func numEval(e Expr, v byte, a float64) (float64, error) {
+func numEval(e Expr, v string, a float64) (float64, error) {
 	switch n := e.(type) {
 	case Num:
 		return n.Float()
@@ -1003,7 +1003,7 @@ func numEval(e Expr, v byte, a float64) (float64, error) {
 		if n.Name == v {
 			return a, nil
 		}
-		return 0, fmt.Errorf("variable %q sin sustituir", string(n.Name))
+		return 0, fmt.Errorf("variable %q sin sustituir", n.Name)
 	case Const:
 		if n.Name == "pi" {
 			return math.Pi, nil
@@ -1026,7 +1026,7 @@ func numEval(e Expr, v byte, a float64) (float64, error) {
 	return 0, errors.New("evaluación numérica no soportada")
 }
 
-func numEvalAdd(n Add, v byte, a float64) (float64, error) {
+func numEvalAdd(n Add, v string, a float64) (float64, error) {
 	sum := 0.0
 	for _, t := range n.Terms {
 		x, err := numEval(t, v, a)
@@ -1038,7 +1038,7 @@ func numEvalAdd(n Add, v byte, a float64) (float64, error) {
 	return sum, nil
 }
 
-func numEvalMul(n Mul, v byte, a float64) (float64, error) {
+func numEvalMul(n Mul, v string, a float64) (float64, error) {
 	prod := 1.0
 	for _, f := range n.Factors {
 		x, err := numEval(f, v, a)
@@ -1050,7 +1050,7 @@ func numEvalMul(n Mul, v byte, a float64) (float64, error) {
 	return prod, nil
 }
 
-func numEvalDiv(n Div, v byte, a float64) (float64, error) {
+func numEvalDiv(n Div, v string, a float64) (float64, error) {
 	num, err := numEval(n.Num, v, a)
 	if err != nil {
 		return 0, err
@@ -1062,7 +1062,7 @@ func numEvalDiv(n Div, v byte, a float64) (float64, error) {
 	return num / den, nil
 }
 
-func numEvalPow(n Pow, v byte, a float64) (float64, error) {
+func numEvalPow(n Pow, v string, a float64) (float64, error) {
 	b, err := numEval(n.Base, v, a)
 	if err != nil {
 		return 0, err
@@ -1074,7 +1074,7 @@ func numEvalPow(n Pow, v byte, a float64) (float64, error) {
 	return math.Pow(b, xp), nil
 }
 
-func numEvalCall(n Call, v byte, a float64) (float64, error) {
+func numEvalCall(n Call, v string, a float64) (float64, error) {
 	x, err := numEval(n.Arg, v, a)
 	if err != nil {
 		return 0, err

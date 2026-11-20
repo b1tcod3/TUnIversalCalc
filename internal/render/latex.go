@@ -9,11 +9,59 @@ import "strings"
 //   - pi → \pi, inf → \infty
 //   - +, -, =, / se rodean de espacios (el '-' unitario no)
 func ToLatex(s string) string {
-	s = strings.ReplaceAll(s, "pi", `\pi`)
-	s = strings.ReplaceAll(s, "inf", `\infty`)
+	s = replaceIdent(s, "pi", `\pi`)
+	s = replaceIdent(s, "inf", `\infty`)
+	s = wrapRaiz(s)
 	s = expandPowersLatex(s)
 	s = wrapSqrt(s)
 	return spaceOperators(s)
+}
+
+// wrapRaiz convierte raiz(n, expr) en \sqrt[n]{expr}; raiz(2, expr) usa
+// la forma corta \sqrt{expr}. Se procesa antes de expandPowersLatex para
+// que los exponentes del radicando también se conviertan.
+func wrapRaiz(s string) string {
+	if !strings.Contains(s, "raiz(") {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if !strings.HasPrefix(s[i:], "raiz(") {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		inner, next := groupLatex(s, i+4)
+		idx, rad := splitRootInner(inner)
+		idx = strings.TrimSpace(idx)
+		rad = wrapRaiz(strings.TrimSpace(rad))
+		if idx == "2" || idx == "" {
+			b.WriteString(`\sqrt{` + rad + `}`)
+		} else {
+			b.WriteString(`\sqrt[` + idx + `]{` + rad + `}`)
+		}
+		i = next
+	}
+	return b.String()
+}
+
+// splitRootInner separa el índice y el radicando de raiz(n, expr). Si no
+// hay índice, raiz(expr) se trata como raíz cuadrada (índice 2).
+func splitRootInner(inner string) (idx, rad string) {
+	depth := 0
+	for i := range len(inner) {
+		switch inner[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				return inner[:i], inner[i+1:]
+			}
+		}
+	}
+	return "2", inner
 }
 
 // expandPowersLatex convierte '^' en ^{...}: x^2 -> x^{2}, x^(2y) -> x^{2y}.

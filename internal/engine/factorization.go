@@ -324,9 +324,9 @@ func FormatExpanded(f Factorization) string {
 	return strings.Join(parts, " · ")
 }
 
-// evalFactorizar produce los pasos de la descomposición para el panel de
-// salida.
-func evalFactorizar(decl Decl) ([]string, error) {
+// evalFactorizarEntero produce los pasos de la descomposición de un entero
+// para el panel de salida.
+func evalFactorizarEntero(decl Decl) ([]string, error) {
 	if decl.Tipo != DeclExpresion {
 		return nil, errors.New("factorizar opera sobre una expresión entera: usa /expresion 120")
 	}

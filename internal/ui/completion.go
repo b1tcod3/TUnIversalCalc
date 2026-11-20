@@ -29,6 +29,7 @@ type completion struct {
 
 var builtinCompletions = []completionItem{
 	{Text: "sqrt", Desc: "raíz cuadrada"},
+	{Text: "raiz", Desc: "raíz n-ésima: raiz(n, expr)"},
 	{Text: "sin", Desc: "seno"},
 	{Text: "cos", Desc: "coseno"},
 	{Text: "abs", Desc: "valor absoluto"},

@@ -89,6 +89,7 @@ func (m *Model) restore(s uiSnapshot) {
 	m.tabHinted = s.TabHinted
 
 	m.helpOpen = false
+	m.clearConfirm = false
 	m.closePalette()
 	m.closeCompletion()
 	m.clearPreview()

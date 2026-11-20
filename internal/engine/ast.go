@@ -19,8 +19,8 @@ type Expr interface {
 // Num es una constante numérica (texto original o construida por el motor).
 type Num struct{ Text string }
 
-// Var es una variable de una sola letra.
-type Var struct{ Name byte }
+// Var es una variable simbólica; el lexer admite nombres de varias letras.
+type Var struct{ Name string }
 
 // Const es una constante simbólica: pi o inf.
 type Const struct{ Name string } // "pi" | "inf"
@@ -102,7 +102,7 @@ func (n Num) isNeg() bool {
 
 func (e Num) Ascii() string { return e.Text }
 
-func (e Var) Ascii() string { return string(e.Name) }
+func (e Var) Ascii() string { return e.Name }
 
 func (e Const) Ascii() string { return e.Name }
 
@@ -176,7 +176,7 @@ func (e Pow) Ascii() string {
 
 func powBaseAscii(b Expr) string {
 	switch b.(type) {
-	case Add, Mul, Div, Neg:
+	case Add, Mul, Div, Neg, Pow:
 		return "(" + b.Ascii() + ")"
 	}
 	return b.Ascii()
@@ -201,7 +201,7 @@ func (e Call) Ascii() string {
 // --- utilidades compartidas ---
 
 // isVarIn informa si la variable v aparece en el árbol.
-func isVarIn(e Expr, v byte) bool {
+func isVarIn(e Expr, v string) bool {
 	switch n := e.(type) {
 	case Var:
 		return n.Name == v
@@ -232,9 +232,9 @@ func isVarIn(e Expr, v byte) bool {
 }
 
 // varList devuelve las variables presentes, en orden de aparición.
-func varList(e Expr) []byte {
-	seen := map[byte]bool{}
-	var out []byte
+func varList(e Expr) []string {
+	seen := map[string]bool{}
+	var out []string
 	var walk func(x Expr)
 	walk = func(x Expr) {
 		switch n := x.(type) {

@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"tuniversalcalc/internal/engine"
 
@@ -51,6 +52,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if sessionFingerprint(m.sessionData()) == msg.fingerprint {
 			m.dirty = false
+		} else {
+			// Llegó el resultado de un guardado antiguo mientras el estado
+			// actual ya cambió: hay que volver a guardar.
+			m.dirty = true
 		}
 		return m, nil
 
@@ -125,6 +130,17 @@ func (m *Model) applyResult(res ResultMsg) {
 //
 //nolint:gocyclo // un case por atajo de teclado, sin lógica anidada
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	// La confirmación de /limpiar es el modal de mayor prioridad.
+	if m.clearConfirm {
+		return m.handleClearConfirmKey(msg)
+	}
+
+	// Ctrl+L abre la misma confirmación que /limpiar desde cualquier panel.
+	if msg.Type == tea.KeyCtrlL {
+		m.openClearConfirm()
+		return nil, true
+	}
+
 	// El selector de sesiones es modal y tiene prioridad.
 	if m.picker.open {
 		return m.handleSessionPickerKey(msg)
@@ -260,7 +276,13 @@ func (m *Model) jumpNextTemplateField() {
 //     salta al panel 2.
 //   - Comando: si matchea una plantilla la inserta; si no, resuelve el
 //     objeto (por nombre o el último) y ejecuta el motor.
+//
+//nolint:gocyclo // despacho de Enter entre declaración, comando y /limpiar
 func (m *Model) handleEnter() tea.Cmd {
+	if isClearCommand(m.focusedInputValue()) {
+		m.openClearConfirm()
+		return nil
+	}
 	switch m.focus {
 	case FocusDecl:
 		raw := strings.TrimSpace(m.declInput.Value())
@@ -313,14 +335,19 @@ func (m *Model) handleEnter() tea.Cmd {
 			}
 		}
 		if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
-			m.pushUndo()
-			m.invalidatePending()
-			val, pos := JumpNextField(tpl.InsertText, 0)
-			m.cmdInput.SetValue(val)
-			m.cmdInput.SetCursor(pos)
-			m.dirty = true
-			m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
-			return nil
+			// /potencia y /radical no necesitan argumentos: si se escriben
+			// completos, se ejecutan directamente sin insertar la plantilla.
+			full := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(m.cmdInput.Value(), "/")))
+			if !isObjectOnlyCommand(tpl.Trigger) || full != tpl.Trigger {
+				m.pushUndo()
+				m.invalidatePending()
+				val, pos := JumpNextField(tpl.InsertText, 0)
+				m.cmdInput.SetValue(val)
+				m.cmdInput.SetCursor(pos)
+				m.dirty = true
+				m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
+				return nil
+			}
 		}
 
 		val := strings.TrimSpace(m.cmdInput.Value())
@@ -351,6 +378,14 @@ func (m *Model) resolveTarget(command string) (engine.Decl, string, bool) {
 	if d, ok := m.literalIntegerDecl(command); ok {
 		return d, "x", true
 	}
+	if len(toks) > 0 && isObjectOnlyCommand(toks[0]) {
+		decl, err := m.resolveObjectTarget(toks)
+		if err != nil {
+			m.addLog(LevelError, err.Error())
+			return engine.Decl{}, "", false
+		}
+		return decl, "x", true
+	}
 	decl, varName, err := m.resolveTargetTokens(toks)
 	if err != nil {
 		m.addLog(LevelError, err.Error())
@@ -359,13 +394,45 @@ func (m *Model) resolveTarget(command string) (engine.Decl, string, bool) {
 	return decl, varName, true
 }
 
+// isObjectOnlyCommand marca las operaciones que actúan sobre la expresión
+// completa y no sobre una variable concreta.
+func isObjectOnlyCommand(tok string) bool {
+	name := strings.ToLower(strings.TrimPrefix(tok, "/"))
+	return strings.HasPrefix(name, "potencia") ||
+		strings.HasPrefix(name, "radical") ||
+		strings.HasPrefix(name, "desarrollar") ||
+		strings.HasPrefix(name, "factorizar")
+}
+
+// resolveObjectTarget resuelve /potencia o /potencia p1 sin admitir un
+// segundo token como variable.
+func (m *Model) resolveObjectTarget(toks []string) (engine.Decl, error) {
+	if len(toks) == 1 {
+		name, err := m.defaultTargetName()
+		if err != nil {
+			return engine.Decl{}, err
+		}
+		return m.objs[name], nil
+	}
+	if len(toks) == 2 {
+		name := strings.ToLower(toks[1])
+		decl, ok := m.objs[name]
+		if ok {
+			return decl, nil
+		}
+		return engine.Decl{}, fmt.Errorf("objeto %q no declarado — declarados: %s", name, m.objList())
+	}
+	cmd := strings.TrimPrefix(toks[0], "/")
+	return engine.Decl{}, fmt.Errorf("/%s opera sobre una expresión completa: usa /%s o /%s p1", cmd, cmd, cmd)
+}
+
 // resolveTargetTokens resuelve objeto y variable a partir de los tokens de un
 // comando. Comparte la lógica entre la ejecución real y la previsualización.
 func (m *Model) resolveTargetTokens(toks []string) (engine.Decl, string, error) {
 	if len(toks) == 0 {
 		return engine.Decl{}, "", errors.New("comando vacío")
 	}
-	objName, varName, err := m.parseTargetName(toks)
+	objName, varName, explicit, err := m.parseTargetName(toks)
 	if err != nil {
 		return engine.Decl{}, "", err
 	}
@@ -373,29 +440,71 @@ func (m *Model) resolveTargetTokens(toks []string) (engine.Decl, string, error) 
 	if !ok {
 		return engine.Decl{}, "", fmt.Errorf("objeto %q no declarado — declarados: %s", objName, m.objList())
 	}
+	if explicit {
+		if err := validateTargetVar(decl, varName); err != nil {
+			if looksLikeObjectName(varName) {
+				return engine.Decl{}, "", fmt.Errorf("objeto %q no declarado — declarados: %s", varName, m.objList())
+			}
+			return engine.Decl{}, "", err
+		}
+	}
 	return decl, varName, nil
 }
 
+// looksLikeObjectName reconoce los auto-nombres e1, f1, p1, t1... para dar
+// un error de objeto en vez de uno de variable cuando el usuario se equivoca.
+func looksLikeObjectName(s string) bool {
+	if len(s) < 2 || !isASCIIDigit(s[1]) {
+		return false
+	}
+	for i := 2; i < len(s); i++ {
+		if !isASCIIDigit(s[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func isASCIIDigit(c byte) bool { return c >= '0' && c <= '9' }
+
 // parseTargetName interpreta el objeto y la variable de los tokens del
 // comando, aplicando el último objeto declarado como valor por defecto.
-func (m *Model) parseTargetName(toks []string) (objName, varName string, err error) {
+// El tercer valor indica si la variable se escribió explícitamente.
+func (m *Model) parseTargetName(toks []string) (objName, varName string, explicit bool, err error) {
 	if len(toks) < 2 {
 		objName, err = m.defaultTargetName()
-		return objName, "x", err
+		return objName, "x", false, err
 	}
-	name := toks[1]
+	name := strings.ToLower(toks[1])
 	if _, ok := m.objs[name]; ok {
 		varName = "x"
 		if len(toks) >= 3 {
-			varName = toks[2]
+			varName = strings.ToLower(toks[2])
+			explicit = true
 		}
-		return name, varName, nil
-	}
-	if len(name) > 1 {
-		return "", "", fmt.Errorf("objeto %q no declarado — declarados: %s", name, m.objList())
+		return name, varName, explicit, nil
 	}
 	objName, err = m.defaultTargetName()
-	return objName, name, err
+	return objName, name, true, err
+}
+
+// validateTargetVar comprueba que la variable citada exista en el objeto.
+// Los puntos no tienen variables propias: cualquier identificador vale.
+func validateTargetVar(decl engine.Decl, name string) error {
+	if !engine.ValidIdentifier(name) {
+		return fmt.Errorf("variable %q no válida: usa letras y dígitos", name)
+	}
+	if decl.Tipo == engine.DeclPuntos {
+		return nil
+	}
+	vars := engine.VariablesOf(decl)
+	if slices.Contains(vars, name) {
+		return nil
+	}
+	if len(vars) == 0 {
+		return fmt.Errorf("el objeto %s no tiene variables; no se puede usar %q", decl.Nombre, name)
+	}
+	return fmt.Errorf("la variable %q no aparece en %s — variables: %s", name, decl.Nombre, strings.Join(vars, ", "))
 }
 
 // defaultTargetName devuelve el último objeto declarado o un error si aún no
@@ -506,16 +615,7 @@ func (m *Model) renderLog() string {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
-		switch e.Level {
-		case LevelSuccess:
-			b.WriteString(levelSuccessStyle.Render("✔ " + e.Content))
-		case LevelError:
-			b.WriteString(levelErrorStyle.Render("✗ " + e.Content))
-		case LevelStep:
-			b.WriteString(levelStepStyle.Render("⚙ " + e.Content))
-		default:
-			b.WriteString(levelInfoStyle.Render("ℹ " + e.Content))
-		}
+		b.WriteString(renderLogEntry(e.Level, e.Content, m.output.Width))
 	}
 	return b.String()
 }
@@ -556,8 +656,16 @@ func (m *Model) updateLayout() {
 	if h < 2 {
 		h = 2
 	}
+	// Al cambiar el ancho hay que volver a envolver la salida, porque el
+	// viewport recorta las líneas que no caben. Si el usuario estaba al
+	// final, se mantiene allí tras el reajuste.
+	atBottom := m.output.AtBottom()
 	m.output.Width = w
 	m.output.Height = h
+	m.output.SetContent(m.renderLog())
+	if atBottom {
+		m.output.GotoBottom()
+	}
 
 	// Filas visibles de la paleta: contenido del panel menos título,
 	// blanco e input. 2..7 para que nunca desborde el layout.

@@ -59,13 +59,62 @@ func ToSubscript(s string) string {
 // Pretty convierte una expresión ASCII a su presentación Unicode:
 // x^2 -> x², x^(2y) -> x²ʸ, sqrt -> √, pi -> π, * -> ·, - -> −
 func Pretty(s string) string {
-	s = strings.ReplaceAll(s, "sqrt", SqrtSymbol)
-	s = strings.ReplaceAll(s, "pi", PiSymbol)
-	s = strings.ReplaceAll(s, "inf", InfinitySymbol)
+	s = prettyRaiz(s)
+	s = replaceIdent(s, "sqrt", SqrtSymbol)
+	s = replaceIdent(s, "pi", PiSymbol)
+	s = replaceIdent(s, "inf", InfinitySymbol)
 	s = expandPowers(s)
 	s = strings.ReplaceAll(s, "*", DotSymbol)
 	s = strings.ReplaceAll(s, "-", MinusSymbol)
 	return s
+}
+
+// prettyRaiz convierte raiz(n, expr) en su símbolo Unicode: √, ∛, ∜ o
+// ⁿ√. El radicando se procesa recursivamente para admitir anidamientos.
+func prettyRaiz(s string) string {
+	if !strings.Contains(s, "raiz(") {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if !strings.HasPrefix(s[i:], "raiz(") {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		inner, next := groupLatex(s, i+4)
+		idx, rad := splitRootInner(inner)
+		idx = strings.TrimSpace(idx)
+		rad = Pretty(strings.TrimSpace(rad))
+		sym := rootSymbol(idx)
+		if needsRootParens(rad) {
+			b.WriteString(sym + "(" + rad + ")")
+		} else {
+			b.WriteString(sym + rad)
+		}
+		i = next
+	}
+	return b.String()
+}
+
+// rootSymbol elige el símbolo de raíz para un índice.
+func rootSymbol(idx string) string {
+	switch idx {
+	case "2":
+		return SqrtSymbol
+	case "3":
+		return "∛"
+	case "4":
+		return "∜"
+	default:
+		return ToSuperscript(idx) + SqrtSymbol
+	}
+}
+
+// needsRootParens indica si el radicando necesita paréntesis para no
+// cambiar el significado al quitar la llamada raiz(...).
+func needsRootParens(s string) bool {
+	return strings.ContainsAny(s, "+−·/ ()⁰¹²³⁴⁵⁶⁷⁸⁹")
 }
 
 // expandPowers reemplaza el operador ^ por superíndices Unicode.

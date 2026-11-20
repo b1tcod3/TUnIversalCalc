@@ -24,10 +24,49 @@ Panel 2 — operaciones
 ---------------------
   /lagrange [objeto]   Polinomio interpolador de Lagrange
   /newton   [objeto]   Interpolación por diferencias divididas
-  /factorizar [n]      Factores primos de un entero o de un objeto
+  /factorizar [obj]    Factoriza enteros, polinomios o fracciones
+  /desarrollar [obj]   Desarrollo de productos notables
+  /potencia [objeto]   Simplificación exacta de potencias
+  /radical  [objeto]   Simplificación exacta de radicales
+  /limpiar             Borra objetos, historial, salida e inputs
+
+/limpiar funciona desde cualquier panel y pide confirmación (s/N).
+Al confirmar, la sesión actual se guarda vacía y no hay Ctrl+Z.
 
 Un /expresion con un entero literal (por ejemplo /expresion 120)
 muestra automáticamente su factorización.
+
+/potencia y /radical operan sobre la expresión completa:
+  /expresion (3a^3b^3)(4ab^2)^2   → /potencia
+  /expresion sqrt(200)-sqrt(32)  → /radical
+  /expresion (a+b)^2             → /desarrollar
+  /expresion 2x^2+5x-12          → /factorizar
+  /expresion (x^2-1)/(x-1)       → /factorizar
+/factorizar combina fracciones algebraicas, factoriza numerador y
+denominador y cancela los factores comunes.
+Para extraer una raíz nueva, declara raiz(expr) o raiz(n, expr);
+/radical se encarga de simplificarla.
+
+Matemáticas exactas
+-------------------
+El motor exacto de /potencia y /radical usa fracciones y exponentes
+racionales (sin float): 3/2, -1/2, raíces y coeficientes exactos.
+  sqrt(200)        → 10·√2
+  raiz(9)          → 3
+  raiz(3, 16)      → 2·∛2
+  x^(3/2)          → x√x
+  (2x)^-2          → 1/(4x^2)
+
+/factorizar acepta fracciones de polinomios con exponentes enteros:
+combina las operaciones, factoriza ambos polinomios y cancela.
+
+Variables: una letra (x), o nombres de tres o más letras (alpha,
+beta, tasa). Dos letras seguidas siguen siendo un producto: ab = a*b.
+Para multiplicar variables usa * o un espacio: alpha*beta.
+Ante paréntesis, escribe alpha*(beta+1) (sin espacio no se admite
+como multiplicación implícita).
+Funciones: sqrt, sin, cos, abs, raiz. También pi e inf.
+Las raíces pares asumen variables positivas: sqrt(x^2) = x.
 
 Paleta de comandos
 ------------------
@@ -42,6 +81,7 @@ Atajos
   ↑/↓              Historial (panel 2) o navegar la paleta
   PgUp/PgDn        Scroll del panel de salida
   Ctrl+H           Abrir/cerrar esta ayuda
+  Ctrl+L           Abrir la confirmación para limpiar todo
   Ctrl+O           Selector de sesiones
   Ctrl+Space       Autocompletar funciones, constantes u objetos
   Ctrl+Z / Ctrl+Y  Deshacer / rehacer
@@ -65,8 +105,9 @@ Ctrl+U duplica, Ctrl+D borra (y confirma), Esc cierra.
 Matemáticas
 -----------
 El parser acepta + - * / ^, paréntesis, multiplicación implícita
-(2x, x(y+1)), sqrt, sin, cos, abs, pi e inf. La salida muestra LaTeX
-emulado y una versión Unicode legible.
+(2x, x(y+1)), sqrt, raiz(x), raiz(n, x), sin, cos, abs, pi e inf.
+Variables de una letra o nombres de tres o más letras. La salida
+muestra LaTeX emulado y una versión Unicode legible.
 
 Créditos
 --------

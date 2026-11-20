@@ -110,24 +110,28 @@ func TestEvaluateFactorizar(t *testing.T) {
 }
 
 func TestEvaluateFactorizarErrores(t *testing.T) {
-	// Solo expresiones enteras.
+	// Los puntos no son expresiones factorizables.
 	puntos := Decl{Nombre: "t1", Tipo: DeclPuntos, Raw: "(1,2) (3,4)"}
 	if _, err := evalDecl(t, puntos, "/factorizar"); err == nil ||
-		!strings.Contains(err.Error(), "expresión entera") {
+		!strings.Contains(err.Error(), "expresión") {
 		t.Fatalf("puntos deben fallar: %v", err)
 	}
 
-	// Decimales no son enteros literales.
+	// Decimales no son enteros ni polinomios no constantes.
 	dec := Decl{Nombre: "p1", Tipo: DeclExpresion, Raw: "12.5", Latex: "12.5"}
 	if _, err := evalDecl(t, dec, "/factorizar"); err == nil ||
-		!strings.Contains(err.Error(), "entero literal") {
+		!strings.Contains(err.Error(), "entero o un polinomio") {
 		t.Fatalf("12.5 debe fallar: %v", err)
 	}
 
-	// Una función tampoco es una expresión entera.
+	// Una función constante entera sí se factoriza como entero.
 	fn := Decl{Nombre: "f1", Tipo: DeclFuncion, Raw: "120", Latex: "120"}
-	if _, err := evalDecl(t, fn, "/factorizar"); err == nil {
-		t.Fatal("una función debe fallar")
+	steps, err := evalDecl(t, fn, "/factorizar")
+	if err != nil {
+		t.Fatalf("función constante 120: %v", err)
+	}
+	if !strings.Contains(strings.Join(steps, "|"), "2³ · 3 · 5") {
+		t.Fatalf("factorización entera ausente: %v", steps)
 	}
 }
 

@@ -100,4 +100,10 @@ var (
 			Padding(0, 1)
 	helpTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(colorOutput)
 	helpFooterStyle = lipgloss.NewStyle().Foreground(colorInfo)
+
+	confirmBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorError).
+			Padding(0, 1)
+	confirmTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(colorError)
 )

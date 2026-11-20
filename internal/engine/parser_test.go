@@ -27,6 +27,10 @@ func TestParsePrecedence(t *testing.T) {
 		{"2/-3", "2/(-3)"}, // el signo se normaliza al simplificar
 		{"x^2 - x + 1", "x^2 - x + 1"},
 		{"sqrt(x)+1", "sqrt(x) + 1"},
+		{"2ab", "2*a*b"},
+		{"alpha beta", "alpha*beta"},
+		{"alpha*(beta+1)", "alpha*(beta + 1)"},
+		{"alphabeta", "alphabeta"},
 	}
 	for _, c := range cases {
 		got := mustParse(t, c.in).Ascii()
@@ -75,6 +79,30 @@ func TestParseErrors(t *testing.T) {
 	for _, in := range []string{"2x+2=", "2x=0=1"} {
 		if _, _, err := ParseEquation(in); err == nil {
 			t.Errorf("ParseEquation(%q) debe fallar", in)
+		}
+	}
+}
+
+func TestParseRaiz(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"raiz(9)", "sqrt(9)"},
+		{"raiz(x)", "sqrt(x)"},
+		{"raiz(3, 8)", "8^(1/3)"},
+		{"raiz(2, x)", "sqrt(x)"},
+		{"raiz(1, x+1)", "x + 1"},
+		{"raiz(3, -8)", "-8^(1/3)"},
+		{"raiz(4, x^6)", "(x^6)^(1/4)"},
+	}
+	for _, c := range cases {
+		if got := mustParse(t, c.in).Ascii(); got != c.want {
+			t.Errorf("ParseExpr(%q) = %q, se esperaba %q", c.in, got, c.want)
+		}
+	}
+	for _, in := range []string{
+		"raiz(0, x)", "raiz(3.5, x)", "raiz(3, x, y)", "raiz(2, -4)", "raiz(-4)",
+	} {
+		if _, err := ParseExpr(in); err == nil {
+			t.Errorf("ParseExpr(%q) debe fallar", in)
 		}
 	}
 }

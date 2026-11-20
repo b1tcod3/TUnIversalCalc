@@ -421,6 +421,7 @@ func (m *Model) applySession(name string, data SessionData) {
 	m.reqSeq = 0
 	m.pendingReq = 0
 	m.helpOpen = false
+	m.clearConfirm = false
 	m.closePalette()
 	m.closeCompletion()
 	m.clearPreview()
