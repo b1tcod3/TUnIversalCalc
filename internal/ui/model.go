@@ -144,7 +144,7 @@ func welcomeLog() []LogEntry {
 
 func (m *Model) Init() tea.Cmd {
 	if m.sessionEnabled {
-		return tea.Batch(textinput.Blink, m.autosaveTick())
+		return tea.Batch(textinput.Blink, autosaveTick())
 	}
 	return textinput.Blink
 }

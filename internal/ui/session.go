@@ -464,7 +464,7 @@ func (m *Model) DisableSession() {
 }
 
 // autosaveTick programa el siguiente guardado automático.
-func (m *Model) autosaveTick() tea.Cmd {
+func autosaveTick() tea.Cmd {
 	return tea.Tick(autosaveInterval, func(time.Time) tea.Msg {
 		return autosaveMsg{}
 	})

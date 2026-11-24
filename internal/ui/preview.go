@@ -96,7 +96,7 @@ func (m *Model) previewTarget(command string) (engine.Decl, string, bool) {
 		return engine.Decl{}, "", false
 	}
 	toks := splitCommandTokens(normalizeCommandArgs(command))
-	if d, ok := m.literalIntegerDecl(command); ok {
+	if d, ok := literalIntegerDecl(command); ok {
 		return d, "x", true
 	}
 	if len(toks) > 0 && isObjectOnlyCommand(toks[0]) {

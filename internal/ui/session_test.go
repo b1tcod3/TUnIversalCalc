@@ -166,8 +166,7 @@ func TestDisableSession(t *testing.T) {
 
 func TestAutosaveTick(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		m := newFlowModel()
-		cmd := m.autosaveTick()
+		cmd := autosaveTick()
 		if cmd == nil {
 			t.Fatal("autosaveTick debe devolver un comando")
 		}

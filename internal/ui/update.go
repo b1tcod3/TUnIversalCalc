@@ -34,7 +34,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case autosaveMsg:
-		cmds := []tea.Cmd{m.autosaveTick()}
+		cmds := []tea.Cmd{autosaveTick()}
 		if m.dirty {
 			if cmd := m.saveSessionCmd(); cmd != nil {
 				cmds = append(cmds, cmd)
@@ -330,7 +330,7 @@ func (m *Model) handleEnter() tea.Cmd {
 
 	case FocusCmd:
 		if !m.declValid {
-			if _, ok := m.literalIntegerDecl(m.cmdInput.Value()); !ok {
+			if _, ok := literalIntegerDecl(m.cmdInput.Value()); !ok {
 				return nil
 			}
 		}
@@ -375,7 +375,7 @@ func (m *Model) handleEnter() tea.Cmd {
 //   - /newton g1      → error si "g1" no es un objeto declarado
 func (m *Model) resolveTarget(command string) (engine.Decl, string, bool) {
 	toks := splitCommandTokens(normalizeCommandArgs(command))
-	if d, ok := m.literalIntegerDecl(command); ok {
+	if d, ok := literalIntegerDecl(command); ok {
 		return d, "x", true
 	}
 	if len(toks) > 0 && isObjectOnlyCommand(toks[0]) {
@@ -518,7 +518,7 @@ func (m *Model) defaultTargetName() (string, error) {
 
 // literalIntegerDecl permite usar /factorizar 120 sin declarar el número
 // como objeto. Solo aplica al comando de factorización.
-func (m *Model) literalIntegerDecl(command string) (engine.Decl, bool) {
+func literalIntegerDecl(command string) (engine.Decl, bool) {
 	toks := splitCommandTokens(normalizeCommandArgs(command))
 	if len(toks) < 2 || !isFactorCommand(toks[0]) {
 		return engine.Decl{}, false

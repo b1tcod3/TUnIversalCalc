@@ -86,7 +86,6 @@ linters:
         - name: unused-parameter
           disabled: true
         - name: unused-receiver
-          disabled: true
 
   exclusions:
     # Los tests suelen ser largos y con muchos casos; las métricas de

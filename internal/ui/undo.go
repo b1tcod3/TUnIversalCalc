@@ -3,8 +3,6 @@ package ui
 import (
 	"maps"
 	"tuniversalcalc/internal/engine"
-
-	"github.com/charmbracelet/bubbles/textinput"
 )
 
 const maxUndoLevels = 50
@@ -64,9 +62,9 @@ func (m *Model) snapshot() uiSnapshot {
 // restore aplica un snapshot al modelo.
 func (m *Model) restore(s uiSnapshot) {
 	m.declInput.SetValue(s.DeclValue)
-	m.setCursor(&m.declInput, s.DeclCursor)
+	m.declInput.SetCursor(s.DeclCursor)
 	m.cmdInput.SetValue(s.CmdValue)
-	m.setCursor(&m.cmdInput, s.CmdCursor)
+	m.cmdInput.SetCursor(s.CmdCursor)
 
 	m.focus = s.Focus
 	m.declInput.Blur()
@@ -97,11 +95,6 @@ func (m *Model) restore(s uiSnapshot) {
 	m.output.SetContent(m.renderLog())
 	m.output.GotoBottom()
 	m.dirty = true
-}
-
-// setCursor fija el cursor; textinput lo acota al rango válido.
-func (m *Model) setCursor(ti *textinput.Model, pos int) {
-	ti.SetCursor(pos)
 }
 
 // pushUndo guarda el estado actual antes de una acción que lo modifica.

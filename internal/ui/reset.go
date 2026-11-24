@@ -64,9 +64,9 @@ func (m *Model) applyClearWorkspace() {
 
 	m.focus = FocusDecl
 	m.declInput.SetValue("")
-	m.setCursor(&m.declInput, 0)
+	m.declInput.SetCursor(0)
 	m.cmdInput.SetValue("")
-	m.setCursor(&m.cmdInput, 0)
+	m.cmdInput.SetCursor(0)
 	m.cmdInput.Blur()
 	m.declInput.Focus()
 
