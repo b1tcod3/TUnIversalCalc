@@ -104,7 +104,7 @@ func ListSessions() []SessionMeta {
 	if err != nil {
 		return nil
 	}
-	out := []SessionMeta{}
+	var out []SessionMeta
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), sessionExt) {
 			continue
