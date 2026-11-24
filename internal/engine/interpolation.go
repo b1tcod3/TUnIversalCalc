@@ -59,8 +59,10 @@ func Lagrange(points []Point) ([]string, error) {
 		}
 	}
 
-	steps = append(steps, "Combinación: P(x) = Σ yi·Li(x)")
-	steps = append(steps, "Polinomio (expandido): P(x) = "+formatPoly(coeff))
+	steps = append(steps,
+		"Combinación: P(x) = Σ yi·Li(x)",
+		"Polinomio (expandido): P(x) = "+formatPoly(coeff),
+	)
 	return steps, nil
 }
 

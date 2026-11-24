@@ -57,6 +57,9 @@ linters:
     - nolintlint
 
   settings:
+    gocritic:
+      enabled-checks:
+        - appendCombine
     errcheck:
       check-type-assertions: true
     dupl:
