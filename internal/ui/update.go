@@ -14,7 +14,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.handleMessage(msg); handled {
 		return m, cmd
 	}
-	return m, m.updateFocusedInput(msg)
+	cmd := m.updateFocusedInput(msg)
+	return m, cmd
 }
 
 // handleMessage atiende los mensajes propios del ciclo Elm y los eventos de

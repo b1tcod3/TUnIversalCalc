@@ -60,6 +60,7 @@ linters:
     gocritic:
       enabled-checks:
         - appendCombine
+        - evalOrder
     errcheck:
       check-type-assertions: true
     dupl:
