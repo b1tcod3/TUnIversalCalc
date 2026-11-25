@@ -222,6 +222,7 @@ func TestIntegrateUnsupported(t *testing.T) {
 }
 
 func TestLimitSubstitution(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		in   string
@@ -255,6 +256,7 @@ func TestLimitSubstitution(t *testing.T) {
 }
 
 func TestSimplifyPublicAPI(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		in    string
