@@ -429,12 +429,31 @@ func factorPerfectSquareTrinomial(p Polynomial) ([]Polynomial, []string, bool, e
 }
 
 // factorQuadratic factoriza ax^2+bx+c con raíces racionales.
-//
-//nolint:gocyclo // resolución exacta del trinomio y construcción de factores
 func factorQuadratic(p Polynomial) ([]Polynomial, []string, bool, error) {
+	name, a, b, c, ok := quadraticCoefficients(p)
+	if !ok {
+		return nil, nil, false, nil
+	}
+	disc, r1, r2, ok, err := quadraticRoots(a, b, c)
+	if err != nil || !ok {
+		return nil, nil, false, err
+	}
+	factors, err := quadraticFactors(name, a, r1, r2)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	steps := []string{
+		"Trinomio: a=" + ratString(a) + ", b=" + ratString(b) + ", c=" + ratString(c),
+		"Discriminante: Δ = " + ratString(disc),
+		"Raíces racionales: " + ratString(r1) + " y " + ratString(r2),
+	}
+	return factors, steps, true, nil
+}
+
+func quadraticCoefficients(p Polynomial) (name string, a, b, c *big.Rat, ok bool) {
 	name, coeffs, ok := univariateCoeffs(p)
 	if !ok || name == "" {
-		return nil, nil, false, nil
+		return "", nil, nil, nil, false
 	}
 	maxDeg := 0
 	for d := range coeffs {
@@ -443,47 +462,54 @@ func factorQuadratic(p Polynomial) ([]Polynomial, []string, bool, error) {
 		}
 	}
 	if maxDeg != 2 {
-		return nil, nil, false, nil
+		return "", nil, nil, nil, false
 	}
-	A := coeffs[2]
-	if A == nil || A.Sign() == 0 {
-		return nil, nil, false, nil
+	a = coeffs[2]
+	if a == nil || a.Sign() == 0 {
+		return "", nil, nil, nil, false
 	}
-	B := coeffs[1]
-	if B == nil {
-		B = ratZero()
+	b = coeffs[1]
+	if b == nil {
+		b = ratZero()
 	}
-	C := coeffs[0]
-	if C == nil {
-		C = ratZero()
+	c = coeffs[0]
+	if c == nil {
+		c = ratZero()
 	}
-	disc := ratSub(ratMul(B, B), ratMul(ratFromInt64(4), ratMul(A, C)))
+	return name, a, b, c, true
+}
+
+func quadraticRoots(a, b, c *big.Rat) (disc, r1, r2 *big.Rat, ok bool, err error) {
+	disc = ratSub(ratMul(b, b), ratMul(ratFromInt64(4), ratMul(a, c)))
 	sqrtD, ok := ratSqrt(disc)
 	if !ok {
-		return nil, nil, false, nil
+		return nil, nil, nil, false, nil
 	}
-	twoA := ratMul(ratFromInt64(2), A)
-	r1, err := ratQuo(ratAdd(ratNeg(B), sqrtD), twoA)
+	twoA := ratMul(ratFromInt64(2), a)
+	r1, err = ratQuo(ratAdd(ratNeg(b), sqrtD), twoA)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, nil, false, err
 	}
-	r2, err := ratQuo(ratSub(ratNeg(B), sqrtD), twoA)
+	r2, err = ratQuo(ratSub(ratNeg(b), sqrtD), twoA)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, nil, false, err
 	}
+	return disc, r1, r2, true, nil
+}
 
+func quadraticFactors(name string, a, r1, r2 *big.Rat) ([]Polynomial, error) {
 	f1, q1, err := linearFactor(name, r1)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, err
 	}
 	f2, q2, err := linearFactor(name, r2)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, err
 	}
 	qProd := ratMul(ratFromInt(q1), ratFromInt(q2))
-	content, err := ratQuo(A, qProd)
+	content, err := ratQuo(a, qProd)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, err
 	}
 
 	var factors []Polynomial
@@ -496,12 +522,7 @@ func factorQuadratic(p Polynomial) ([]Polynomial, []string, bool, error) {
 	} else {
 		factors = append(factors, f1)
 	}
-	steps := []string{
-		"Trinomio: a=" + ratString(A) + ", b=" + ratString(B) + ", c=" + ratString(C),
-		"Discriminante: Δ = " + ratString(disc),
-		"Raíces racionales: " + ratString(r1) + " y " + ratString(r2),
-	}
-	return factors, steps, true, nil
+	return factors, nil
 }
 
 func linearFactor(name string, root *big.Rat) (Polynomial, *big.Int, error) {
@@ -886,55 +907,63 @@ func formatFactorPolynomial(p Polynomial, unicode bool) string {
 	return "(" + ascii + ")"
 }
 
-//nolint:gocyclo // formato de coeficientes, bases y exponentes exactos
 func formatFactorMonomial(m *Monomial, unicode bool) string {
 	if m == nil || m.isZero() {
 		return "0"
 	}
-	bases := make([]Base, 0, len(m.Factors))
-	for b := range m.Factors {
-		bases = append(bases, b)
-	}
-	sort.Slice(bases, func(i, j int) bool { return compareBase(bases[i], bases[j]) < 0 })
+	bases := sortedMonomialBases(m.Factors)
 	sep := "*"
 	if unicode {
 		sep = "·"
 	}
-	var parts []string
-	coeff := m.Coeff
-	if coeff.Cmp(ratOne()) != 0 || len(bases) == 0 {
-		if coeff.Cmp(ratFromInt64(-1)) == 0 && len(bases) > 0 {
-			// el signo se conserva en el primer factor
-			parts = append(parts, "-1")
-		} else {
-			parts = append(parts, ratString(coeff))
-		}
+	parts := make([]string, 0, len(bases)+1)
+	if coeff := formatMonomialCoeff(m.Coeff, len(bases) > 0); coeff != "" {
+		parts = append(parts, coeff)
 	}
 	for _, b := range bases {
-		e := m.Factors[b]
-		name := b.Var
-		if b.Kind == BasePrime {
-			name = strconv.FormatUint(b.Prime, 10)
-		}
-		if e.Cmp(ratOne()) == 0 {
-			parts = append(parts, name)
-			continue
-		}
-		if e.IsInt() && e.Num().IsInt64() {
-			n := e.Num().Int64()
-			if n > 0 && !unicode {
-				parts = append(parts, name+"^"+strconv.FormatInt(n, 10))
-				continue
-			}
-			if n > 0 && unicode {
-				parts = append(parts, name+renderSuperscriptInt64(n))
-				continue
-			}
-		}
-		exp := ratString(e)
-		parts = append(parts, name+"^("+exp+")")
+		parts = append(parts, formatBasePower(b, m.Factors[b], unicode))
 	}
 	return strings.Join(parts, sep)
+}
+
+func sortedMonomialBases(factors map[Base]*big.Rat) []Base {
+	bases := make([]Base, 0, len(factors))
+	for b := range factors {
+		bases = append(bases, b)
+	}
+	sort.Slice(bases, func(i, j int) bool { return compareBase(bases[i], bases[j]) < 0 })
+	return bases
+}
+
+func formatMonomialCoeff(coeff *big.Rat, hasBases bool) string {
+	if hasBases && coeff.Cmp(ratOne()) == 0 {
+		return ""
+	}
+	// el signo se conserva en el primer factor
+	if hasBases && coeff.Cmp(ratFromInt64(-1)) == 0 {
+		return "-1"
+	}
+	return ratString(coeff)
+}
+
+func formatBasePower(b Base, e *big.Rat, unicode bool) string {
+	name := b.Var
+	if b.Kind == BasePrime {
+		name = strconv.FormatUint(b.Prime, 10)
+	}
+	if e.Cmp(ratOne()) == 0 {
+		return name
+	}
+	if e.IsInt() && e.Num().IsInt64() {
+		n := e.Num().Int64()
+		if n > 0 && !unicode {
+			return name + "^" + strconv.FormatInt(n, 10)
+		}
+		if n > 0 {
+			return name + renderSuperscriptInt64(n)
+		}
+	}
+	return name + "^(" + ratString(e) + ")"
 }
 
 func renderSuperscriptInt(n int) string {

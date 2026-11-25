@@ -85,7 +85,18 @@ func ParseDecl(raw string) (Decl, error) {
 		return Decl{}, fmt.Errorf("comando %s sin contenido: ej. /ecuacion 2x+2=0", cmd)
 	}
 
-	d := Decl{Raw: content}
+	d, err := parseDeclContent(cmd, content)
+	if err != nil {
+		return Decl{}, err
+	}
+	d.Raw = content
+	d.Latex = render.ToLatex(content)
+	d.Pretty = render.Pretty(content)
+	return d, nil
+}
+
+func parseDeclContent(cmd, content string) (Decl, error) {
+	d := Decl{}
 	switch {
 	case strings.HasPrefix(cmd, "ecuac"):
 		d.Tipo = DeclEcuacion
@@ -94,18 +105,12 @@ func ParseDecl(raw string) (Decl, error) {
 		}
 	case strings.HasPrefix(cmd, "func"):
 		d.Tipo = DeclFuncion
-		if strings.Contains(content, "=") {
-			return Decl{}, errors.New("una función no lleva '=': /funcion 2x+2")
-		}
-		if _, err := ParseExpr(content); err != nil {
+		if err := validateExpressionDecl(content, "una función", "/funcion 2x+2"); err != nil {
 			return Decl{}, err
 		}
 	case strings.HasPrefix(cmd, "expres"):
 		d.Tipo = DeclExpresion
-		if strings.Contains(content, "=") {
-			return Decl{}, errors.New("una expresión no lleva '=': /expresion x^2+1")
-		}
-		if _, err := ParseExpr(content); err != nil {
+		if err := validateExpressionDecl(content, "una expresión", "/expresion x^2+1"); err != nil {
 			return Decl{}, err
 		}
 	case strings.HasPrefix(cmd, "punt"):
@@ -118,10 +123,15 @@ func ParseDecl(raw string) (Decl, error) {
 	default:
 		return Decl{}, fmt.Errorf("comando no reconocido: %q — usa /ecuacion, /funcion, /expresion o /puntos", cmd)
 	}
-
-	d.Latex = render.ToLatex(content)
-	d.Pretty = render.Pretty(content)
 	return d, nil
+}
+
+func validateExpressionDecl(content, kind, example string) error {
+	if strings.Contains(content, "=") {
+		return fmt.Errorf("%s no lleva '=': %s", kind, example)
+	}
+	_, err := ParseExpr(content)
+	return err
 }
 
 // parsePoints interpreta una lista de puntos en formato "(x,y)" separados

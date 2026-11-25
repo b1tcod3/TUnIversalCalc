@@ -55,58 +55,71 @@ func Desarrollar(e Expr) (ExactResult, error) {
 // notableProductSteps reconoce las formas notables más habituales y
 // devuelve una o dos líneas explicativas. Es solo presentación: la
 // expansión real la hace ExprToPolynomial.
-//
-//nolint:gocyclo // detección de varias formas notables en un solo switch
 func notableProductSteps(e Expr) []string {
 	switch n := e.(type) {
 	case Pow:
-		if exp, ok := exprInt(n.Exp); ok {
-			if base, ok := n.Base.(Add); ok {
-				add := flattenAdd(base)
-				switch {
-				case len(add.Terms) == 2 && exp == 2:
-					return []string{
-						"Producto notable: cuadrado de un binomio",
-						"(u ± v)^2 = u^2 ± 2*u*v + v^2",
-					}
-				case len(add.Terms) == 2 && exp == 3:
-					return []string{
-						"Producto notable: cubo de un binomio",
-						"(u ± v)^3 = u^3 ± 3*u^2*v + 3*u*v^2 ± v^3",
-					}
-				case len(add.Terms) == 2 && exp > 3:
-					return []string{
-						"Producto notable: binomio de Newton",
-						"(u + v)^n = Σ C(n,k)·u^(n−k)·v^k",
-					}
-				case len(add.Terms) == 3 && exp == 2:
-					return []string{
-						"Producto notable: cuadrado de un trinomio",
-						"(u + v + w)^2 = u^2 + v^2 + w^2 + 2*u*v + 2*u*w + 2*v*w",
-					}
-				}
-			}
-		}
+		return notablePowerSteps(n)
 	case Mul:
-		if len(n.Factors) == 2 {
-			a0, okA := n.Factors[0].(Add)
-			b0, okB := n.Factors[1].(Add)
-			if okA && okB {
-				a, b := flattenAdd(a0), flattenAdd(b0)
-				if isDifferenceOfSquares(a, b) {
-					return []string{
-						"Producto notable: suma por diferencia",
-						"(u + v)(u − v) = u^2 − v^2",
-					}
-				}
-				return []string{
-					"Producto de binomios: se expande término a término",
-					"(u + a)(u + b) = u^2 + (a + b)u + a*b",
-				}
-			}
+		return notableProductMulSteps(n)
+	}
+	return nil
+}
+
+func notablePowerSteps(n Pow) []string {
+	exp, ok := exprInt(n.Exp)
+	if !ok {
+		return nil
+	}
+	base, ok := n.Base.(Add)
+	if !ok {
+		return nil
+	}
+	add := flattenAdd(base)
+	switch {
+	case len(add.Terms) == 2 && exp == 2:
+		return []string{
+			"Producto notable: cuadrado de un binomio",
+			"(u ± v)^2 = u^2 ± 2*u*v + v^2",
+		}
+	case len(add.Terms) == 2 && exp == 3:
+		return []string{
+			"Producto notable: cubo de un binomio",
+			"(u ± v)^3 = u^3 ± 3*u^2*v + 3*u*v^2 ± v^3",
+		}
+	case len(add.Terms) == 2 && exp > 3:
+		return []string{
+			"Producto notable: binomio de Newton",
+			"(u + v)^n = Σ C(n,k)·u^(n−k)·v^k",
+		}
+	case len(add.Terms) == 3 && exp == 2:
+		return []string{
+			"Producto notable: cuadrado de un trinomio",
+			"(u + v + w)^2 = u^2 + v^2 + w^2 + 2*u*v + 2*u*w + 2*v*w",
 		}
 	}
 	return nil
+}
+
+func notableProductMulSteps(n Mul) []string {
+	if len(n.Factors) != 2 {
+		return nil
+	}
+	a0, okA := n.Factors[0].(Add)
+	b0, okB := n.Factors[1].(Add)
+	if !okA || !okB {
+		return nil
+	}
+	a, b := flattenAdd(a0), flattenAdd(b0)
+	if isDifferenceOfSquares(a, b) {
+		return []string{
+			"Producto notable: suma por diferencia",
+			"(u + v)(u − v) = u^2 − v^2",
+		}
+	}
+	return []string{
+		"Producto de binomios: se expande término a término",
+		"(u + a)(u + b) = u^2 + (a + b)u + a*b",
+	}
 }
 
 // flattenAdd convierte la representación binaria del parser (a+b)+c en una
@@ -125,23 +138,21 @@ func flattenAdd(a Add) Add {
 
 // isDifferenceOfSquares comprueba que dos binomios sean conjugados:
 // (u + v)(u - v), en cualquier orden de factores o de términos.
-//
-//nolint:gocyclo // comparación de las dos ordenaciones posibles de los binomios
 func isDifferenceOfSquares(a, b Add) bool {
-	if len(a.Terms) != 2 || len(b.Terms) != 2 {
-		return false
-	}
 	apos, aneg := splitAddTerms(a)
 	bpos, bneg := splitAddTerms(b)
-	switch {
-	case len(aneg) == 0 && len(bneg) == 1 && len(apos) == 2 && len(bpos) == 1:
-		return sameExpr(apos[0], bpos[0]) && sameExpr(apos[1], bneg[0]) ||
-			sameExpr(apos[1], bpos[0]) && sameExpr(apos[0], bneg[0])
-	case len(bneg) == 0 && len(aneg) == 1 && len(bpos) == 2 && len(apos) == 1:
-		return sameExpr(bpos[0], apos[0]) && sameExpr(bpos[1], aneg[0]) ||
-			sameExpr(bpos[1], apos[0]) && sameExpr(bpos[0], aneg[0])
+	if len(apos) == 2 && len(aneg) == 0 && len(bpos) == 1 && len(bneg) == 1 {
+		return isConjugatePair(apos, bpos[0], bneg[0])
+	}
+	if len(bpos) == 2 && len(bneg) == 0 && len(apos) == 1 && len(aneg) == 1 {
+		return isConjugatePair(bpos, apos[0], aneg[0])
 	}
 	return false
+}
+
+func isConjugatePair(pos []Expr, first, second Expr) bool {
+	return sameExpr(pos[0], first) && sameExpr(pos[1], second) ||
+		sameExpr(pos[1], first) && sameExpr(pos[0], second)
 }
 
 func splitAddTerms(a Add) (pos, neg []Expr) {
