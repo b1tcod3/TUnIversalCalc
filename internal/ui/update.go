@@ -27,7 +27,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case previewTickMsg:
-		return m, m.handlePreviewTick(msg)
+		cmd := m.handlePreviewTick(msg)
+		return m, cmd
 
 	case previewResultMsg:
 		m.applyPreviewResult(msg)
