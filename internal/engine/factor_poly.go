@@ -63,9 +63,17 @@ func FactorizarPolinomio(e Expr) (FactorResult, error) {
 	return FactorResult{Factors: factors, Steps: all, Ascii: ascii, Unicode: unicode}, nil
 }
 
+type factorAttempt func(Polynomial) ([]Polynomial, []string, bool, error)
+
+var factorAttempts = []factorAttempt{
+	factorBinomial,
+	factorPerfectSquareTrinomial,
+	factorQuadratic,
+	factorByGrouping,
+	factorRationalRoots,
+}
+
 // factorPolynomial factoriza recursivamente un polinomio ya canónico.
-//
-//nolint:gocyclo // pipeline de factorización con un paso por patrón
 func factorPolynomial(p Polynomial, depth int) ([]Polynomial, []string, error) {
 	if depth > maxFactorDepth {
 		return []Polynomial{p}, nil, nil
@@ -81,78 +89,51 @@ func factorPolynomial(p Polynomial, depth int) ([]Polynomial, []string, error) {
 		return []Polynomial{p}, nil, nil
 	}
 
+	if factors, steps, ok, err := factorCommon(p, depth); err != nil || ok {
+		return factors, steps, err
+	}
+	for _, attempt := range factorAttempts {
+		if factors, steps, ok, err := tryFactor(attempt, p, depth); err != nil || ok {
+			return factors, steps, err
+		}
+	}
+	return []Polynomial{p}, []string{"No se puede factorizar más sobre los racionales."}, nil
+}
+
+func factorCommon(p Polynomial, depth int) ([]Polynomial, []string, bool, error) {
 	common, err := commonMonomialFactor(p)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
-	if !monomialIsOne(common) {
-		q, err := p.divMonomial(common)
-		if err != nil {
-			return nil, nil, err
-		}
-		sub, subSteps, err := factorPolynomial(q, depth+1)
-		if err != nil {
-			return nil, nil, err
-		}
-		factors := []Polynomial{polynomialFromMonomial(common)}
-		factors = append(factors, sub...)
-		steps := append([]string{
-			"Factor común: " + formatFactorMonomial(common, false),
-		}, subSteps...)
-		return factors, steps, nil
+	if monomialIsOne(common) {
+		return nil, nil, false, nil
 	}
+	q, err := p.divMonomial(common)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	sub, subSteps, err := factorPolynomial(q, depth+1)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	factors := []Polynomial{polynomialFromMonomial(common)}
+	factors = append(factors, sub...)
+	steps := append([]string{
+		"Factor común: " + formatFactorMonomial(common, false),
+	}, subSteps...)
+	return factors, steps, true, nil
+}
 
-	if fs, st, ok, err := factorBinomial(p); err != nil {
-		return nil, nil, err
-	} else if ok {
-		factors, subSteps, err := factorEach(fs, depth+1)
-		if err != nil {
-			return nil, nil, err
-		}
-		return factors, append(st, subSteps...), nil
+func tryFactor(attempt factorAttempt, p Polynomial, depth int) ([]Polynomial, []string, bool, error) {
+	fs, st, ok, err := attempt(p)
+	if err != nil || !ok {
+		return nil, nil, ok, err
 	}
-
-	if fs, st, ok, err := factorPerfectSquareTrinomial(p); err != nil {
-		return nil, nil, err
-	} else if ok {
-		factors, subSteps, err := factorEach(fs, depth+1)
-		if err != nil {
-			return nil, nil, err
-		}
-		return factors, append(st, subSteps...), nil
+	factors, subSteps, err := factorEach(fs, depth+1)
+	if err != nil {
+		return nil, nil, false, err
 	}
-
-	if fs, st, ok, err := factorQuadratic(p); err != nil {
-		return nil, nil, err
-	} else if ok {
-		factors, subSteps, err := factorEach(fs, depth+1)
-		if err != nil {
-			return nil, nil, err
-		}
-		return factors, append(st, subSteps...), nil
-	}
-
-	if fs, st, ok, err := factorByGrouping(p); err != nil {
-		return nil, nil, err
-	} else if ok {
-		factors, subSteps, err := factorEach(fs, depth+1)
-		if err != nil {
-			return nil, nil, err
-		}
-		return factors, append(st, subSteps...), nil
-	}
-
-	if fs, st, ok, err := factorRationalRoots(p); err != nil {
-		return nil, nil, err
-	} else if ok {
-		factors, subSteps, err := factorEach(fs, depth+1)
-		if err != nil {
-			return nil, nil, err
-		}
-		return factors, append(st, subSteps...), nil
-	}
-
-	return []Polynomial{p}, []string{"No se puede factorizar más sobre los racionales."}, nil
+	return factors, append(st, subSteps...), true, nil
 }
 
 func factorEach(fs []Polynomial, depth int) ([]Polynomial, []string, error) {

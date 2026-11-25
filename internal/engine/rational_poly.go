@@ -155,66 +155,84 @@ func exprIsConstantPolynomial(e Expr) bool {
 
 // exprToRational convierte el AST a una fracción de polinomios. Admite las
 // operaciones racionales habituales y potencias con exponente entero.
-//
-//nolint:gocyclo // un case por tipo de nodo del AST
 func exprToRational(e Expr) (rationalExpr, error) {
 	switch n := e.(type) {
 	case Num, Var:
-		p, err := ExprToPolynomial(n)
-		if err != nil {
-			return rationalExpr{}, err
-		}
-		return rationalExpr{Num: p, Den: onePolynomial()}, nil
+		return rationalFromAtomic(n)
 	case Const:
 		return rationalExpr{}, fmt.Errorf("la constante %q no pertenece a una expresión racional", n.Name)
 	case Neg:
-		r, err := exprToRational(n.X)
-		if err != nil {
-			return rationalExpr{}, err
-		}
-		return rationalExpr{Num: r.Num.neg(), Den: r.Den}.canonical()
+		return rationalFromNeg(n)
 	case Add:
-		out := rationalExpr{Num: nil, Den: onePolynomial()}
-		for _, t := range n.Terms {
-			r, err := exprToRational(t)
-			if err != nil {
-				return rationalExpr{}, err
-			}
-			out, err = rationalAdd(out, r)
-			if err != nil {
-				return rationalExpr{}, err
-			}
-		}
-		return out.canonical()
+		return rationalFromAdd(n)
 	case Mul:
-		out := rationalExpr{Num: onePolynomial(), Den: onePolynomial()}
-		for _, f := range n.Factors {
-			r, err := exprToRational(f)
-			if err != nil {
-				return rationalExpr{}, err
-			}
-			out, err = rationalMul(out, r)
-			if err != nil {
-				return rationalExpr{}, err
-			}
-		}
-		return out.canonical()
+		return rationalFromMul(n)
 	case Div:
-		a, err := exprToRational(n.Num)
-		if err != nil {
-			return rationalExpr{}, err
-		}
-		b, err := exprToRational(n.Den)
-		if err != nil {
-			return rationalExpr{}, err
-		}
-		return rationalDiv(a, b)
+		return rationalFromDiv(n)
 	case Pow:
 		return rationalPow(n)
 	case Call:
 		return rationalExpr{}, fmt.Errorf("la función %s() no pertenece a una expresión racional", n.Name)
 	}
 	return rationalExpr{}, fmt.Errorf("expresión no soportada como expresión racional: %T", e)
+}
+
+func rationalFromAtomic(e Expr) (rationalExpr, error) {
+	p, err := ExprToPolynomial(e)
+	if err != nil {
+		return rationalExpr{}, err
+	}
+	return rationalExpr{Num: p, Den: onePolynomial()}, nil
+}
+
+func rationalFromNeg(n Neg) (rationalExpr, error) {
+	r, err := exprToRational(n.X)
+	if err != nil {
+		return rationalExpr{}, err
+	}
+	return rationalExpr{Num: r.Num.neg(), Den: r.Den}.canonical()
+}
+
+func rationalFromAdd(n Add) (rationalExpr, error) {
+	out := rationalExpr{Num: nil, Den: onePolynomial()}
+	for _, t := range n.Terms {
+		r, err := exprToRational(t)
+		if err != nil {
+			return rationalExpr{}, err
+		}
+		out, err = rationalAdd(out, r)
+		if err != nil {
+			return rationalExpr{}, err
+		}
+	}
+	return out.canonical()
+}
+
+func rationalFromMul(n Mul) (rationalExpr, error) {
+	out := rationalExpr{Num: onePolynomial(), Den: onePolynomial()}
+	for _, f := range n.Factors {
+		r, err := exprToRational(f)
+		if err != nil {
+			return rationalExpr{}, err
+		}
+		out, err = rationalMul(out, r)
+		if err != nil {
+			return rationalExpr{}, err
+		}
+	}
+	return out.canonical()
+}
+
+func rationalFromDiv(n Div) (rationalExpr, error) {
+	a, err := exprToRational(n.Num)
+	if err != nil {
+		return rationalExpr{}, err
+	}
+	b, err := exprToRational(n.Den)
+	if err != nil {
+		return rationalExpr{}, err
+	}
+	return rationalDiv(a, b)
 }
 
 func rationalPow(n Pow) (rationalExpr, error) {
