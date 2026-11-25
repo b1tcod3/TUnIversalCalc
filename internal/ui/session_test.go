@@ -35,26 +35,34 @@ func TestSessionRoundtrip(t *testing.T) {
 	withTempSessions(t)
 
 	m := newFlowModel()
-	m.declInput.SetValue("/puntos (1,2) (3,4) (5,6)")
-	m.handleEnter()
-	m.cmdInput.SetValue("/lagrange t1")
-	cmd := m.handleEnter()
-	if cmd == nil {
-		t.Fatal("la operación debe producir un comando")
-	}
-	m.applyResult(mustResultMsg(t, cmd))
+	declararPuntosYEjecutarLagrange(t, &m)
+	guardarSesionDePrueba(t, &m, "trabajo")
+	data := cargarSesionDePrueba(t, "trabajo")
+	comprobarDatosSesion(t, data)
+	comprobarRestauracionSesion(t, data)
+}
 
-	if err := SaveSession("trabajo", m.sessionData()); err != nil {
+func guardarSesionDePrueba(t *testing.T, m *Model, name string) {
+	t.Helper()
+	if err := SaveSession(name, m.sessionData()); err != nil {
 		t.Fatalf("SaveSession: %v", err)
 	}
-	if !SessionExists("trabajo") {
+	if !SessionExists(name) {
 		t.Fatal("la sesión no existe tras guardar")
 	}
+}
 
-	data, err := LoadSession("trabajo")
+func cargarSesionDePrueba(t *testing.T, name string) SessionData {
+	t.Helper()
+	data, err := LoadSession(name)
 	if err != nil {
 		t.Fatalf("LoadSession: %v", err)
 	}
+	return data
+}
+
+func comprobarDatosSesion(t *testing.T, data SessionData) {
+	t.Helper()
 	if len(data.Objects) != 1 || data.Objects["t1"].Tipo != engine.DeclPuntos {
 		t.Fatalf("objetos no persistidos: %+v", data.Objects)
 	}
@@ -67,17 +75,20 @@ func TestSessionRoundtrip(t *testing.T) {
 	if data.Counters[engine.DeclPuntos] != 1 {
 		t.Fatalf("contadores no persistidos: %+v", data.Counters)
 	}
+}
 
-	m2 := newFlowModel()
-	m2.applySession("trabajo", data)
-	if len(m2.objs) != 1 || !m2.declValid || m2.lastObj != "t1" {
-		t.Fatalf("applySession incorrecto: objs=%v last=%q valid=%v", m2.objs, m2.lastObj, m2.declValid)
+func comprobarRestauracionSesion(t *testing.T, data SessionData) {
+	t.Helper()
+	m := newFlowModel()
+	m.applySession("trabajo", data)
+	if len(m.objs) != 1 || !m.declValid || m.lastObj != "t1" {
+		t.Fatalf("applySession incorrecto: objs=%v last=%q valid=%v", m.objs, m.lastObj, m.declValid)
 	}
-	if m2.SessionName() != "trabajo" || m2.dirty {
-		t.Fatalf("estado de sesión incorrecto: name=%q dirty=%v", m2.SessionName(), m2.dirty)
+	if m.SessionName() != "trabajo" || m.dirty {
+		t.Fatalf("estado de sesión incorrecto: name=%q dirty=%v", m.SessionName(), m.dirty)
 	}
-	if !strings.Contains(m2.plainOutput(), "Listo") {
-		t.Fatalf("salida no restaurada: %q", m2.plainOutput())
+	if !strings.Contains(m.plainOutput(), "Listo") {
+		t.Fatalf("salida no restaurada: %q", m.plainOutput())
 	}
 }
 

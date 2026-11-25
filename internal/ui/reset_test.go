@@ -69,24 +69,25 @@ func TestLimpiarPideConfirmacionYCancela(t *testing.T) {
 
 func TestLimpiarConfirmaYBorra(t *testing.T) {
 	m := newFlowModel()
-	m.declInput.SetValue("/puntos (1,2) (3,4) (5,6)")
-	m.handleEnter()
-	m.cmdInput.SetValue("/lagrange t1")
-	cmd := m.handleEnter()
-	if cmd == nil {
-		t.Fatal("lagrange debe ejecutarse")
-	}
-	m.applyResult(mustResultMsg(t, cmd))
+	declararPuntosYEjecutarLagrange(t, &m)
+	confirmarLimpieza(t, &m)
+	comprobarEstadoLimpio(t, &m)
+}
 
+func confirmarLimpieza(t *testing.T, m *Model) {
+	t.Helper()
 	m.cmdInput.SetValue("/limpiar")
 	m.handleEnter()
 	if _, handled := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}}); !handled {
 		t.Fatal("s debe manejarse")
 	}
-
 	if m.clearConfirm {
 		t.Fatal("el modal debe cerrarse")
 	}
+}
+
+func comprobarEstadoLimpio(t *testing.T, m *Model) {
+	t.Helper()
 	if len(m.objs) != 0 || m.lastObj != "" {
 		t.Fatalf("quedaron objetos: %v / %q", m.objs, m.lastObj)
 	}

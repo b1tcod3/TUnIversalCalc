@@ -142,6 +142,20 @@ func mustResultMsg(t *testing.T, cmd tea.Cmd) ResultMsg {
 	return msg
 }
 
+// declararPuntosYEjecutarLagrange registra t1 con tres puntos y ejecuta
+// /lagrange t1, dejando el resultado aplicado en el modelo.
+func declararPuntosYEjecutarLagrange(t *testing.T, m *Model) {
+	t.Helper()
+	m.declInput.SetValue("/puntos (1,2) (3,4) (5,6)")
+	m.handleEnter()
+	m.cmdInput.SetValue("/lagrange t1")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("lagrange debe ejecutarse")
+	}
+	m.applyResult(mustResultMsg(t, cmd))
+}
+
 // declararEcuacion registra e1 = 2x + 2 = 0 vía el panel 1.
 func declararEcuacion(t *testing.T, m *Model) {
 	t.Helper()
