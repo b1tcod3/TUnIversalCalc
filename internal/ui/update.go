@@ -10,78 +10,87 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-//nolint:gocyclo // despachador central de mensajes del bucle Elm
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if cmd, handled := m.handleMessage(msg); handled {
+		return m, cmd
+	}
+	return m, m.updateFocusedInput(msg)
+}
+
+// handleMessage atiende los mensajes propios del ciclo Elm y los eventos de
+// terminal. Devuelve handled=false para que el mensaje llegue al input activo.
+func (m *Model) handleMessage(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		m.updateLayout()
-		if m.helpOpen {
-			m.layoutHelp()
-		}
-		return m, nil
-
+		return m.handleWindowSize(msg), true
 	case ResultMsg:
 		m.applyResult(msg)
-		return m, nil
-
+		return nil, true
 	case previewTickMsg:
-		cmd := m.handlePreviewTick(msg)
-		return m, cmd
-
+		return m.handlePreviewTick(msg), true
 	case previewResultMsg:
 		m.applyPreviewResult(msg)
-		return m, nil
-
+		return nil, true
 	case autosaveMsg:
-		cmds := []tea.Cmd{autosaveTick()}
-		if m.dirty {
-			if cmd := m.saveSessionCmd(); cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-		}
-		return m, tea.Batch(cmds...)
-
+		return m.handleAutosave(), true
 	case sessionSavedMsg:
-		if msg.name != m.sessionName {
-			return m, nil
-		}
-		if msg.err != nil {
-			m.addLog(LevelError, "No se pudo guardar la sesión: "+msg.err.Error())
-			return m, nil
-		}
-		if sessionFingerprint(m.sessionData()) == msg.fingerprint {
-			m.dirty = false
-		} else {
-			// Llegó el resultado de un guardado antiguo mientras el estado
-			// actual ya cambió: hay que volver a guardar.
-			m.dirty = true
-		}
-		return m, nil
-
+		m.handleSessionSaved(msg)
+		return nil, true
 	case tea.MouseMsg:
-		if cmd, handled := m.handleMouse(msg); handled {
-			return m, cmd
-		}
-
+		return m.handleMouse(msg)
 	case tea.KeyMsg:
-		if cmd, handled := m.handleKey(msg); handled {
-			return m, cmd
+		return m.handleKey(msg)
+	}
+	return nil, false
+}
+
+func (m *Model) handleWindowSize(msg tea.WindowSizeMsg) tea.Cmd {
+	m.width = msg.Width
+	m.height = msg.Height
+	m.updateLayout()
+	if m.helpOpen {
+		m.layoutHelp()
+	}
+	return nil
+}
+
+func (m *Model) handleAutosave() tea.Cmd {
+	cmds := []tea.Cmd{autosaveTick()}
+	if m.dirty {
+		if cmd := m.saveSessionCmd(); cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 	}
+	return tea.Batch(cmds...)
+}
 
-	// Enrutar el mensaje solo al input enfocado (el otro devuelve nil)
-	var cmd tea.Cmd
+func (m *Model) handleSessionSaved(msg sessionSavedMsg) {
+	if msg.name != m.sessionName {
+		return
+	}
+	if msg.err != nil {
+		m.addLog(LevelError, "No se pudo guardar la sesión: "+msg.err.Error())
+		return
+	}
+	// Un guardado antiguo puede llegar cuando el estado ya cambió: en ese
+	// caso hay que volver a guardar.
+	m.dirty = sessionFingerprint(m.sessionData()) != msg.fingerprint
+}
+
+// updateFocusedInput enruta el mensaje solo al input enfocado (el otro
+// devuelve nil) y programa la previsualización si el texto cambió.
+func (m *Model) updateFocusedInput(msg tea.Msg) tea.Cmd {
 	if m.picker.open {
+		var cmd tea.Cmd
 		m.picker.query, cmd = m.picker.query.Update(msg)
-		return m, cmd
+		return cmd
 	}
 	oldValue := m.focusedInputValue()
 	ti := &m.cmdInput
 	if m.focus == FocusDecl {
 		ti = &m.declInput
 	}
+	var cmd tea.Cmd
 	*ti, cmd = ti.Update(msg)
 	if m.focusedInputValue() != oldValue {
 		m.dirty = true
@@ -92,7 +101,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	m.refreshPalette()
-	return m, cmd
+	return cmd
 }
 
 // focusedInputValue devuelve el texto del panel activo.
@@ -128,98 +137,118 @@ func (m *Model) applyResult(res ResultMsg) {
 
 // handleKey procesa una tecla. El segundo valor indica si el mensaje quedó
 // manejado; si no, cae al input enfocado.
-//
-//nolint:gocyclo // un case por atajo de teclado, sin lógica anidada
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if cmd, handled, modal := m.handleModalKey(msg); modal {
+		return cmd, handled
+	}
+	return m.handleShortcut(msg)
+}
+
+// handleModalKey da prioridad a los modales abiertos. El tercer valor indica
+// si algún modal consumió la tecla, manejada o no.
+func (m *Model) handleModalKey(msg tea.KeyMsg) (tea.Cmd, bool, bool) {
 	// La confirmación de /limpiar es el modal de mayor prioridad.
 	if m.clearConfirm {
-		return m.handleClearConfirmKey(msg)
+		cmd, handled := m.handleClearConfirmKey(msg)
+		return cmd, handled, true
 	}
 
 	// Ctrl+L abre la misma confirmación que /limpiar desde cualquier panel.
 	if msg.Type == tea.KeyCtrlL {
 		m.openClearConfirm()
-		return nil, true
+		return nil, true, true
 	}
 
 	// El selector de sesiones es modal y tiene prioridad.
 	if m.picker.open {
-		return m.handleSessionPickerKey(msg)
+		cmd, handled := m.handleSessionPickerKey(msg)
+		return cmd, handled, true
 	}
 
 	// La ayuda modal tiene prioridad sobre paneles y paleta.
 	if m.helpOpen {
-		return m.handleHelpKey(msg)
+		cmd, handled := m.handleHelpKey(msg)
+		return cmd, handled, true
 	}
 
-	// Paleta abierta: navegar, insertar o cerrar tiene prioridad
+	// Paleta abierta: navegar, insertar o cerrar tiene prioridad.
 	if m.palette.Open {
-		return m.handlePaletteKey(msg)
+		cmd, handled := m.handlePaletteKey(msg)
+		return cmd, handled, true
 	}
 
 	// Popup de autocompletado de expresiones.
 	if m.completion.Open {
-		return m.handleCompletionKey(msg)
+		cmd, handled := m.handleCompletionKey(msg)
+		return cmd, handled, true
 	}
+	return nil, false, false
+}
 
+func (m *Model) handleShortcut(msg tea.KeyMsg) (tea.Cmd, bool) {
+	if cmd, handled := m.handleGlobalShortcut(msg); handled {
+		return cmd, handled
+	}
+	if cmd, handled := m.handlePanelShortcut(msg); handled {
+		return cmd, handled
+	}
+	return m.handleOutputScroll(msg)
+}
+
+func (m *Model) handleGlobalShortcut(msg tea.KeyMsg) (tea.Cmd, bool) {
 	switch msg.Type {
 	case tea.KeyCtrlC, tea.KeyEsc:
 		return m.quit(), true
-
 	case tea.KeyCtrlAt:
 		m.openCompletions()
 		return nil, true
-
 	case tea.KeyCtrlH:
 		m.toggleHelp()
 		return nil, true
-
 	case tea.KeyCtrlO:
 		m.openSessionPicker()
 		return nil, true
-
 	case tea.KeyCtrlZ:
 		m.undo()
 		return nil, true
-
 	case tea.KeyCtrlY:
 		m.redo()
 		return nil, true
-
 	case tea.KeyCtrlS:
 		return m.manualSave(), true
-
 	case tea.KeyF2:
 		m.copyOutput()
 		return nil, true
+	}
+	return nil, false
+}
 
-	// Navegación entre paneles
+func (m *Model) handlePanelShortcut(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.Type {
 	case tea.KeyTab:
 		m.switchPanel()
 		return nil, true
-
-	// Salto de campo dentro de una plantilla (ambos paneles)
 	case tea.KeyShiftTab:
 		m.jumpNextTemplateField()
 		return nil, true
-
 	case tea.KeyEnter:
 		return m.handleEnter(), true
-
-	// Historial navegable en el panel de comando
 	case tea.KeyUp:
 		if m.focus == FocusCmd {
 			m.histPrev()
 			return nil, true
 		}
-
 	case tea.KeyDown:
 		if m.focus == FocusCmd {
 			m.histNext()
 			return nil, true
 		}
+	}
+	return nil, false
+}
 
-	// Scroll del panel de salida
+func (m *Model) handleOutputScroll(msg tea.KeyMsg) (tea.Cmd, bool) {
+	switch msg.Type {
 	case tea.KeyPgUp, tea.KeyPgDown:
 		var cmd tea.Cmd
 		m.output, cmd = m.output.Update(msg)
@@ -277,8 +306,6 @@ func (m *Model) jumpNextTemplateField() {
 //     salta al panel 2.
 //   - Comando: si matchea una plantilla la inserta; si no, resuelve el
 //     objeto (por nombre o el último) y ejecuta el motor.
-//
-//nolint:gocyclo // despacho de Enter entre declaración, comando y /limpiar
 func (m *Model) handleEnter() tea.Cmd {
 	if isClearCommand(m.focusedInputValue()) {
 		m.openClearConfirm()
@@ -286,88 +313,95 @@ func (m *Model) handleEnter() tea.Cmd {
 	}
 	switch m.focus {
 	case FocusDecl:
-		raw := strings.TrimSpace(m.declInput.Value())
-		if raw == "" {
-			m.addLog(LevelInfo, "Declara un objeto: /puntos (1,2) (3,4), /funcion 2x+2 o /ecuacion 2x+2=0")
-			return nil
-		}
-		if tpl, ok := matchTemplate(declRegistry, raw); ok {
-			m.pushUndo()
-			m.invalidatePending()
-			val, pos := JumpNextField(tpl.InsertText, 0)
-			m.declInput.SetValue(val)
-			m.declInput.SetCursor(pos)
-			m.dirty = true
-			m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
-			return nil
-		}
-		d, err := engine.ParseDecl(raw)
-		if err != nil {
-			m.addLog(LevelError, err.Error())
-			return nil
-		}
-		m.pushUndo()
-		m.invalidatePending()
-		m.clearPreview()
-		d.Nombre = m.autoName(d.Tipo)
-		m.objs[d.Nombre] = d
-		m.lastObj = d.Nombre
-		m.declValid = true
-		m.tabHinted = false
-		m.addLog(LevelSuccess, d.Nombre+" declarada: "+d.Latex)
-		m.addLog(LevelStep, d.Pretty)
-		m.switchPanel()
-
-		// Detección automática: una expresión que sea un entero literal se
-		// factoriza sin que el usuario tenga que pedirlo.
-		if d.Tipo == engine.DeclExpresion {
-			if _, ok := engine.ParseIntegerLiteral(d.Raw); ok {
-				m.reqSeq++
-				m.pendingReq = m.reqSeq
-				return evaluateCmd(d, "/factorizar", "x", m.pendingReq)
-			}
-		}
-		return nil
-
+		return m.handleEnterDecl()
 	case FocusCmd:
-		if !m.declValid {
-			if _, ok := literalIntegerDecl(m.cmdInput.Value()); !ok {
-				return nil
-			}
-		}
-		if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
-			// /potencia y /radical no necesitan argumentos: si se escriben
-			// completos, se ejecutan directamente sin insertar la plantilla.
-			full := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(m.cmdInput.Value(), "/")))
-			if !isObjectOnlyCommand(tpl.Trigger) || full != tpl.Trigger {
-				m.pushUndo()
-				m.invalidatePending()
-				val, pos := JumpNextField(tpl.InsertText, 0)
-				m.cmdInput.SetValue(val)
-				m.cmdInput.SetCursor(pos)
-				m.dirty = true
-				m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
-				return nil
-			}
-		}
-
-		val := strings.TrimSpace(m.cmdInput.Value())
-		if val == "" {
-			return nil
-		}
-		decl, varName, ok := m.resolveTarget(val)
-		if !ok {
-			return nil
-		}
-		m.pushUndo()
-		m.pushHistory(val)
-		m.addLog(LevelInfo, fmt.Sprintf("Comando: %s  (objeto: %s = %s)", val, decl.Nombre, decl.Latex))
-		m.clearPreview()
-		m.reqSeq++
-		m.pendingReq = m.reqSeq
-		return evaluateCmd(decl, val, varName, m.pendingReq)
+		return m.handleEnterCmd()
 	}
 	return nil
+}
+
+func (m *Model) handleEnterDecl() tea.Cmd {
+	raw := strings.TrimSpace(m.declInput.Value())
+	if raw == "" {
+		m.addLog(LevelInfo, "Declara un objeto: /puntos (1,2) (3,4), /funcion 2x+2 o /ecuacion 2x+2=0")
+		return nil
+	}
+	if tpl, ok := matchTemplate(declRegistry, raw); ok {
+		m.insertTemplate(tpl)
+		return nil
+	}
+	d, err := engine.ParseDecl(raw)
+	if err != nil {
+		m.addLog(LevelError, err.Error())
+		return nil
+	}
+	m.pushUndo()
+	m.invalidatePending()
+	m.clearPreview()
+	d.Nombre = m.autoName(d.Tipo)
+	m.objs[d.Nombre] = d
+	m.lastObj = d.Nombre
+	m.declValid = true
+	m.tabHinted = false
+	m.addLog(LevelSuccess, d.Nombre+" declarada: "+d.Latex)
+	m.addLog(LevelStep, d.Pretty)
+	m.switchPanel()
+
+	// Detección automática: una expresión que sea un entero literal se
+	// factoriza sin que el usuario tenga que pedirlo.
+	if d.Tipo == engine.DeclExpresion {
+		if _, ok := engine.ParseIntegerLiteral(d.Raw); ok {
+			m.reqSeq++
+			m.pendingReq = m.reqSeq
+			return evaluateCmd(d, "/factorizar", "x", m.pendingReq)
+		}
+	}
+	return nil
+}
+
+func (m *Model) handleEnterCmd() tea.Cmd {
+	if !m.declValid {
+		if _, ok := literalIntegerDecl(m.cmdInput.Value()); !ok {
+			return nil
+		}
+	}
+	if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
+		// /potencia y /radical no necesitan argumentos: si se escriben
+		// completos, se ejecutan directamente sin insertar la plantilla.
+		full := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(m.cmdInput.Value(), "/")))
+		if !isObjectOnlyCommand(tpl.Trigger) || full != tpl.Trigger {
+			m.insertTemplate(tpl)
+			return nil
+		}
+	}
+
+	val := strings.TrimSpace(m.cmdInput.Value())
+	if val == "" {
+		return nil
+	}
+	decl, varName, ok := m.resolveTarget(val)
+	if !ok {
+		return nil
+	}
+	m.pushUndo()
+	m.pushHistory(val)
+	m.addLog(LevelInfo, fmt.Sprintf("Comando: %s  (objeto: %s = %s)", val, decl.Nombre, decl.Latex))
+	m.clearPreview()
+	m.reqSeq++
+	m.pendingReq = m.reqSeq
+	return evaluateCmd(decl, val, varName, m.pendingReq)
+}
+
+// insertTemplate rellena el input enfocado con la plantilla elegida.
+func (m *Model) insertTemplate(tpl Template) {
+	m.pushUndo()
+	m.invalidatePending()
+	ti := m.focusedInput()
+	val, pos := JumpNextField(tpl.InsertText, 0)
+	ti.SetValue(val)
+	ti.SetCursor(pos)
+	m.dirty = true
+	m.addLog(LevelInfo, "Plantilla insertada: "+tpl.Trigger+" (Shift+Tab para saltar campos)")
 }
 
 // resolveTarget averigua sobre qué objeto y variable opera el comando:

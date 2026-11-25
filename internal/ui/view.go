@@ -9,47 +9,70 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-//nolint:gocyclo // composición de los tres paneles en una sola pasada
+const helpBarText = "[Tab] Panel • [Enter] Ejecutar • [Ctrl+O] Sesiones • [Ctrl+L] Limpiar • " +
+	"[Ctrl+Z/Y] Undo/Redo • [Ctrl+H] Ayuda • [Ctrl+S] Guardar • [Esc] Salir"
+
 func (m *Model) View() string {
-	if m.clearConfirm {
-		return m.clearConfirmView()
-	}
-	if m.helpOpen {
-		return m.helpView()
-	}
-	if m.picker.open {
-		return m.pickerView()
+	if view, ok := m.modalView(); ok {
+		return view
 	}
 
 	lw, rw := m.leftWidth(), m.rightWidth()
-	innerL, innerR := lw-panelBorder-inputPadX, rw-panelBorder-outputPadX
+	leftColumn := lipgloss.JoinVertical(lipgloss.Top, m.declPanel(lw), m.cmdPanel(lw))
+	grid := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, m.outputPanel(rw))
 
-	// --- PANEL 1: DECLARACIÓN ---
+	help := helpStyle.Render(clampWidth(helpBarText, m.width))
+
+	// Sin newlines externos: el alto total debe ser exactamente m.height
+	// para que la terminal no haga scroll y corte la parte superior.
+	return grid + "\n" + help + "\n" + statusStyle.Render(clampWidth(m.statusBar(), m.width))
+}
+
+func (m *Model) modalView() (string, bool) {
+	switch {
+	case m.clearConfirm:
+		return m.clearConfirmView(), true
+	case m.helpOpen:
+		return m.helpView(), true
+	case m.picker.open:
+		return m.pickerView(), true
+	}
+	return "", false
+}
+
+// declPanel compone el panel 1, incluidos la paleta y el autocompletado.
+func (m *Model) declPanel(lw int) string {
+	innerL := lw - panelBorder - inputPadX
+
 	exprStyle := exprPanelInactive
 	if m.focus == FocusDecl {
 		exprStyle = exprPanelActive
 	}
 	exprStyle = exprStyle.Width(lw - panelBorder).Height(m.leftHeight() - panelBorder)
-	paletteInDecl := m.palette.Open && m.palette.Anchor == FocusDecl
-	completionInDecl := m.completion.Open && m.completion.Anchor == FocusDecl
+
 	exprBody := m.declInput.View()
 	switch {
-	case paletteInDecl:
+	case m.palette.Open && m.palette.Anchor == FocusDecl:
 		exprBody += "\n\n" + m.paletteView()
-	case completionInDecl:
+	case m.completion.Open && m.completion.Anchor == FocusDecl:
 		exprBody += "\n\n" + m.completionView()
 	default:
 		exprBody += m.declEchoLine()
 	}
-	panel1Content := clipLines(
+	content := clipLines(
 		titleRight(" 1. Declaración ", " Declaración ", colorExprActive, innerL)+"\n\n"+exprBody,
 		m.leftHeight()-panelBorder,
 	)
-	panel1 := exprStyle.Render(panel1Content)
+	return exprStyle.Render(content)
+}
 
-	// --- PANEL 2: CÁLCULO (bloqueado sin objetos declarados) ---
+// cmdPanel compone el panel 2, incluido el aviso de panel bloqueado y la
+// previsualización en vivo.
+func (m *Model) cmdPanel(lw int) string {
+	innerL := lw - panelBorder - inputPadX
 	paletteInCmd := m.palette.Open && m.palette.Anchor == FocusCmd
 	completionInCmd := m.completion.Open && m.completion.Anchor == FocusCmd
+
 	calcContent := m.cmdInput.View()
 	switch {
 	case paletteInCmd:
@@ -65,38 +88,30 @@ func (m *Model) View() string {
 			calcContent += "\n\n" + pv
 		}
 	}
+
 	calcStyle := calcPanelInactive
 	if m.focus == FocusCmd && m.declValid {
 		calcStyle = calcPanelActive
 	}
 	calcStyle = calcStyle.Width(lw - panelBorder).Height(m.leftHeight() - panelBorder)
-	panel2Content := clipLines(
+	content := clipLines(
 		titleRight(" 2. Operación/Comando ", " Comando ", colorCalcActive, innerL)+"\n\n"+calcContent,
 		m.leftHeight()-panelBorder,
 	)
-	panel2 := calcStyle.Render(panel2Content)
+	return calcStyle.Render(content)
+}
 
-	// --- PANEL 3: VISTA / PASO A PASO (derecha) ---
-	panel3Content := clipLines(
+// outputPanel compone el panel derecho con la cabecera y el viewport.
+func (m *Model) outputPanel(rw int) string {
+	innerR := rw - panelBorder - outputPadX
+	content := clipLines(
 		m.panel3Header(innerR)+m.output.View(),
 		m.rightHeight()-panelBorder-outputPadY,
 	)
-	panel3 := outputPanelStyle.
+	return outputPanelStyle.
 		Width(rw - panelBorder).
 		Height(m.rightHeight() - panelBorder).
-		Render(panel3Content)
-
-	// --- ENSAMBLADO DE LA CUADRÍCULA ---
-	leftColumn := lipgloss.JoinVertical(lipgloss.Top, panel1, panel2)
-	grid := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, panel3)
-
-	helpText := "[Tab] Panel • [Enter] Ejecutar • [Ctrl+O] Sesiones • [Ctrl+L] Limpiar • " +
-		"[Ctrl+Z/Y] Undo/Redo • [Ctrl+H] Ayuda • [Ctrl+S] Guardar • [Esc] Salir"
-	help := helpStyle.Render(clampWidth(helpText, m.width))
-
-	// Sin newlines externos: el alto total debe ser exactamente m.height
-	// para que la terminal no haga scroll y corte la parte superior.
-	return grid + "\n" + help + "\n" + statusStyle.Render(clampWidth(m.statusBar(), m.width))
+		Render(content)
 }
 
 // declEchoLine muestra en vivo cómo se interpreta la declaración del panel
