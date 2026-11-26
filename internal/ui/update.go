@@ -367,8 +367,8 @@ func (m *Model) handleEnterCmd() tea.Cmd {
 		}
 	}
 	if tpl, ok := matchTemplate(opsRegistry, m.cmdInput.Value()); ok {
-		// /potencia y /radical no necesitan argumentos: si se escriben
-		// completos, se ejecutan directamente sin insertar la plantilla.
+		// /potencia, /radical y /radicalizar no necesitan argumentos: si se
+		// escriben completos, se ejecutan directamente sin insertar la plantilla.
 		full := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(m.cmdInput.Value(), "/")))
 		if !isObjectOnlyCommand(tpl.Trigger) || full != tpl.Trigger {
 			m.insertTemplate(tpl)
@@ -410,7 +410,7 @@ func (m *Model) insertTemplate(tpl Template) {
 //   - /lagrange t1    → objeto t1
 //   - /newton g1      → error si "g1" no es un objeto declarado
 func (m *Model) resolveTarget(command string) (engine.Decl, string, bool) {
-	toks := splitCommandTokens(normalizeCommandArgs(command))
+	toks := commandTokens(command)
 	if d, ok := literalIntegerDecl(command); ok {
 		return d, "x", true
 	}
@@ -552,10 +552,27 @@ func (m *Model) defaultTargetName() (string, error) {
 	return m.lastObj, nil
 }
 
+// commandTokens separa el comando y sus argumentos. En /factorizar se
+// descartan las banderas para que no se confundan con nombres de objetos.
+func commandTokens(command string) []string {
+	toks := splitCommandTokens(normalizeCommandArgs(command))
+	if len(toks) == 0 || !isFactorCommand(toks[0]) {
+		return toks
+	}
+	out := []string{toks[0]}
+	for _, tok := range toks[1:] {
+		if strings.HasPrefix(tok, "-") {
+			continue
+		}
+		out = append(out, tok)
+	}
+	return out
+}
+
 // literalIntegerDecl permite usar /factorizar 120 sin declarar el número
 // como objeto. Solo aplica al comando de factorización.
 func literalIntegerDecl(command string) (engine.Decl, bool) {
-	toks := splitCommandTokens(normalizeCommandArgs(command))
+	toks := commandTokens(command)
 	if len(toks) < 2 || !isFactorCommand(toks[0]) {
 		return engine.Decl{}, false
 	}

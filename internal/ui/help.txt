@@ -25,9 +25,11 @@ Panel 2 — operaciones
   /lagrange [objeto]   Polinomio interpolador de Lagrange
   /newton   [objeto]   Interpolación por diferencias divididas
   /factorizar [obj]    Factoriza enteros, polinomios o fracciones
+  /factorizar -cuadrado [objeto]  Completa el cuadrado de una cuadrática
   /desarrollar [obj]   Desarrollo de productos notables
   /potencia [objeto]   Simplificación exacta de potencias
   /radical  [objeto]   Simplificación exacta de radicales
+  /radicalizar [objeto] Racionaliza fracciones con raíces
   /limpiar             Borra objetos, historial, salida e inputs
 
 /limpiar funciona desde cualquier panel y pide confirmación (s/N).
@@ -36,21 +38,31 @@ Al confirmar, la sesión actual se guarda vacía y no hay Ctrl+Z.
 Un /expresion con un entero literal (por ejemplo /expresion 120)
 muestra automáticamente su factorización.
 
-/potencia y /radical operan sobre la expresión completa:
-  /expresion (3a^3b^3)(4ab^2)^2   → /potencia
-  /expresion sqrt(200)-sqrt(32)  → /radical
-  /expresion (a+b)^2             → /desarrollar
-  /expresion 2x^2+5x-12          → /factorizar
-  /expresion (x^2-1)/(x-1)       → /factorizar
+/potencia, /radical y /radicalizar operan sobre la expresión completa:
+  /expresion (3a^3b^3)(4ab^2)^2      → /potencia
+  /expresion sqrt(200)-sqrt(32)     → /radical
+  /expresion sqrt(10)/(sqrt(5)-2)   → /radicalizar
+  /expresion (sqrt(4+h)-2)/h        → /radicalizar
+  /expresion (a+b)^2                → /desarrollar
+  /expresion 2x^2+5x-12             → /factorizar
+  /expresion (x^2-1)/(x-1)          → /factorizar
+  /expresion 2x^2-12x+11            → /factorizar -cuadrado
 /factorizar combina fracciones algebraicas, factoriza numerador y
 denominador y cancela los factores comunes.
+/factorizar -cuadrado reescribe ax^2+bx+c como a(x-h)^2+k, muestra
+el proceso y el vértice. Requiere una sola variable y coeficientes
+racionales.
+/radicalizar multiplica por el conjugado cuando el numerador o el
+denominador es un binomio con raíces cuadradas; después simplifica y
+cancela factores comunes.
 Para extraer una raíz nueva, declara raiz(expr) o raiz(n, expr);
 /radical se encarga de simplificarla.
 
 Matemáticas exactas
 -------------------
-El motor exacto de /potencia y /radical usa fracciones y exponentes
-racionales (sin float): 3/2, -1/2, raíces y coeficientes exactos.
+El motor exacto de /potencia, /radical y /radicalizar usa fracciones y
+exponentes racionales (sin float): 3/2, -1/2, raíces y coeficientes
+exactos.
   sqrt(200)        → 10·√2
   raiz(9)          → 3
   raiz(3, 16)      → 2·∛2

@@ -20,6 +20,7 @@ var opsRegistry = []Template{
 	{Trigger: "newton", InsertText: "/newton ?", Desc: "Interpolación de Newton (diferencias divididas)"},
 	{Trigger: "potencia", InsertText: "/potencia ?", Desc: "Simplificación exacta de potencias"},
 	{Trigger: "radical", InsertText: "/radical ?", Desc: "Simplificación exacta de radicales"},
+	{Trigger: "radicalizar", InsertText: "/radicalizar ?", Desc: "Racionalización de fracciones con raíces"},
 }
 
 // Registro de plantillas de DECLARACIÓN (panel 1). Los objetos se nombran

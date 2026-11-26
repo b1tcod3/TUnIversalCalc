@@ -38,7 +38,7 @@ func TestBuildPalette(t *testing.T) {
 		t.Fatalf("declaraciones no alfabéticas: %v", names(decl))
 	}
 	ops := buildPalette(opsRegistry, "")
-	if !reflect.DeepEqual(names(ops), []string{"desarrollar", "factorizar", "lagrange", "limpiar", "newton", "potencia", "radical"}) {
+	if !reflect.DeepEqual(names(ops), []string{"desarrollar", "factorizar", "lagrange", "limpiar", "newton", "potencia", "radical", "radicalizar"}) {
 		t.Fatalf("operaciones no alfabéticas: %v", names(ops))
 	}
 
@@ -58,12 +58,31 @@ func TestBuildPalette(t *testing.T) {
 		{opsRegistry, "lim", []string{"limpiar"}},
 		{opsRegistry, "newt", []string{"newton"}},
 		{opsRegistry, "pot", []string{"potencia"}},
-		{opsRegistry, "rad", []string{"radical"}},
+		{opsRegistry, "rad", []string{"radical", "radicalizar"}},
+		{opsRegistry, "radicali", []string{"radicalizar"}},
 		{opsRegistry, "zzz", []string{}},
 	}
 	for _, c := range cases {
 		if got := names(buildPalette(c.list, c.frag)); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("buildPalette(%v, %q) = %v, se esperaba %v", names(c.list), c.frag, got, c.want)
+		}
+	}
+}
+
+func TestMatchTemplateRadicalYRadicalizar(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"/rad", "radical"},
+		{"/radical", "radical"},
+		{"/radicali", "radicalizar"},
+		{"/radicalizar", "radicalizar"},
+	}
+	for _, c := range cases {
+		tpl, ok := matchTemplate(opsRegistry, c.in)
+		if !ok || tpl.Trigger != c.want {
+			t.Errorf("matchTemplate(%q) = %q, %v; se esperaba %q", c.in, tpl.Trigger, ok, c.want)
 		}
 	}
 }

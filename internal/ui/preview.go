@@ -95,7 +95,7 @@ func (m *Model) previewTarget(command string) (engine.Decl, string, bool) {
 	if isClearCommand(command) {
 		return engine.Decl{}, "", false
 	}
-	toks := splitCommandTokens(normalizeCommandArgs(command))
+	toks := commandTokens(command)
 	if d, ok := literalIntegerDecl(command); ok {
 		return d, "x", true
 	}

@@ -986,8 +986,16 @@ func renderSuperscriptInt64(n int64) string {
 }
 
 // evalFactorizar es el dispatcher: enteros al algoritmo actual y
-// expresiones/funciones al factorizador simbólico.
-func evalFactorizar(decl Decl) ([]string, error) {
+// expresiones/funciones al factorizador simbólico. La bandera -cuadrado
+// desvía a la forma canónica de completar el cuadrado.
+func evalFactorizar(decl Decl, op string) ([]string, error) {
+	cuadrado, err := parseFactorFlags(op)
+	if err != nil {
+		return nil, err
+	}
+	if cuadrado {
+		return evalCompletarCuadrado(decl)
+	}
 	if decl.Tipo != DeclExpresion && decl.Tipo != DeclFuncion {
 		return nil, errors.New("factorizar opera sobre una expresión, función o entero literal")
 	}

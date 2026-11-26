@@ -24,7 +24,9 @@ Calculadora TUI (interfaz de texto) en **Go** con **Bubble Tea**, construida con
 - Redimensionamiento dinámico (`tea.WindowSizeMsg`), historial de comandos con `↑/↓`, estilos inmutables (sin mutación de globales en `View()`)
 - **Interpolación polinómica** (cálculo numérico): declaración de puntos con `/puntos` y dos caminos para el mismo polinomio único — Lagrange y Newton. Newton muestra la tabla completa de diferencias divididas. `symbolic.go` (parser Pratt + derivada/integral/etc. simbólicas) se conserva como base del parser.
 - **Factorización de enteros, polinomios y fracciones algebraicas**: al declarar `/expresion 120` o escribir `120` directamente en el panel 1 se detecta el entero y se muestra automáticamente su descomposición en factores primos. `/factorizar` también factoriza polinomios (factor común, diferencia de cuadrados, suma/diferencia de cubos, trinomios, agrupación y raíces racionales) y expresiones racionales: combina numerador y denominador, factoriza ambos y cancela factores comunes. Ejemplos: `4x^2-25 → (2x-5)(2x+5)`, `2x^2+5x-12 → (2x-3)(x+4)`, `(x^2+3x+2)/(x^2-x-2) → (x+2)/(x-2)`, `x^2/(x^2-4)-(x+1)/(x+2) → 1/(x-2)`. Para enteros usa rueda `6k±1`, Miller-Rabin determinista y Pollard Rho.
+- **Completar el cuadrado con `/factorizar -cuadrado`**: reescribe una cuadrática `ax^2+bx+c` como `a(x-h)^2+k`, muestra los pasos y el vértice. Ejemplos: `x^2+x+1 → (x + 1/2)^2 + 3/4`, `2x^2-12x+11 → 2*(x - 3)^2 - 7`.
 - **Álgebra exacta acotada**: `/potencia` y `/radical` simplifican productos, cocientes, potencias y raíces con fracciones exactas (`math/big.Rat`), sin pérdida de precisión. Soportan variables de varias letras y raíces n-ésimas con `raiz(n, expr)` o `x^(1/n)`. Ejemplos: `(3a^3b^3)(4ab^2)^2 → 48·a⁵·b⁷`, `sqrt(200)-sqrt(32) → 6·√2`, `raiz(3,16) → 2·∛2`, `((3x^(3/2)y^3)/(x^2y^(-1/2)))^-2 → x/(9y^7)`.
+- **Racionalización con `/radicalizar`**: multiplica por el conjugado cuando el numerador o el denominador es un binomio con raíces cuadradas, simplifica el resultado y cancela factores comunes. Ejemplos: `sqrt(10)/(sqrt(5)-2) → 5·√2 + 2·√10`, `(sqrt(4+h)-2)/h → 1/(√(4 + h) + 2)`.
 - **Comando `/limpiar` y atajo `Ctrl+L`**: borran objetos, historial, salida, inputs y undo/redo de la sesión actual. Funcionan desde cualquier panel y piden confirmación `s/N`; al confirmar, la sesión se guarda vacía y se conserva su nombre.
 - **Desarrollo de productos notables**: `/desarrollar` expande productos y potencias enteras de sumas y muestra la fórmula reconocida: cuadrado/cubo de un binomio, suma por diferencia, producto de binomios, cuadrado de un trinomio y binomio de Newton.
 - **Sesiones persistentes con autosave**: el trabajo se guarda cada 30 segundos y al salir en `$XDG_DATA_HOME/tuniversalcalc/sessions` (o `~/.local/share/...`). Se puede abrir una sesión concreta por nombre o cambiar entre sesiones con `Ctrl+O`; el selector permite renombrar (`Ctrl+R`), duplicar (`Ctrl+U`) y borrar (`Ctrl+D`).
@@ -131,6 +133,24 @@ El panel 2 permanece bloqueado (⛔) mientras no haya al menos un objeto declara
 → 2*raiz(3, 2)   (Unicode: 2·∛2)
 ```
 
+`/radicalizar` se usa cuando la fracción tiene un binomio con raíces en el
+numerador o en el denominador. Multiplica por el conjugado, simplifica y
+cancela los factores comunes:
+
+```text
+/expresion sqrt(10)/(sqrt(5)-2)
+/radicalizar
+→ 5*sqrt(2) + 2*sqrt(10)   (Unicode: 5·√2 + 2·√10)
+
+/expresion (sqrt(4+h)-2)/h
+/radicalizar
+→ 1/(sqrt(4 + h) + 2)   (Unicode: 1/(√(4 + h) + 2))
+```
+
+El resultado puede seguir conteniendo raíces; lo importante es que el
+binomio original se ha racionalizado y que los factores comunes se han
+cancelado.
+
 Para desarrollar productos notables:
 
 ```text
@@ -184,11 +204,29 @@ el numerador y el denominador y cancela los factores comunes:
 → -x - y
 ```
 
+Para completar el cuadrado de una cuadrática, añade la bandera
+`-cuadrado`:
+
+```text
+/expresion x^2+x+1
+/factorizar -cuadrado
+→ (x + 1/2)^2 + 3/4
+
+/expresion 2x^2-12x+11
+/factorizar -cuadrado
+→ 2*(x - 3)^2 - 7
+```
+
+La salida muestra los coeficientes, la forma mónica cuando el coeficiente
+principal no es 1, el término que se suma y resta, la forma completada y el
+vértice. Solo se admiten polinomios de grado 2 en una variable con
+coeficientes racionales.
+
 El orden de los factores puede variar; el producto es equivalente.
 La cancelación se apoya en los patrones de factorización soportados; un factor
 común que no encaje en ellos puede quedar sin cancelar.
 
-El motor exacto no usa `float64`: los coeficientes y exponentes son fracciones de `math/big.Rat`. No soporta funciones trascendentes (`sin`, `cos`, `ln`), constantes irracionales (`pi`, `inf`) ni números complejos. `/potencia`, `/radical` y `/desarrollar` no admiten división por polinomios que no sean monomios; `/factorizar` sí trata expresiones racionales con exponentes enteros. Para simplificar raíces pares se asume que las variables son positivas (`sqrt(x^2) = x`).
+El motor exacto no usa `float64`: los coeficientes y exponentes son fracciones de `math/big.Rat`. No soporta funciones trascendentes (`sin`, `cos`, `ln`), constantes irracionales (`pi`, `inf`) ni números complejos. `/potencia`, `/radical` y `/desarrollar` no admiten división por polinomios que no sean monomios; `/radicalizar` admite fracciones con binomios de raíces cuadradas y `/factorizar` trata expresiones racionales con exponentes enteros. `/factorizar -cuadrado` requiere una cuadrática univariada con coeficientes racionales. Para simplificar raíces pares se asume que las variables son positivas (`sqrt(x^2) = x`).
 
 Las variables pueden tener una letra (`x`) o tres o más letras (`alpha`, `beta`, `tasa`). Por compatibilidad con la notación algebraica, dos letras seguidas siguen siendo un producto implícito: `ab = a*b`. Para multiplicar nombres largos usa `*` o un espacio (`alpha*beta`); antes de un paréntesis escribe `alpha*(beta+1)`. `raiz(expr)` es la raíz cuadrada y `raiz(n, expr)` la raíz n-ésima.
 
@@ -219,9 +257,11 @@ Al confirmar se conserva el nombre de la sesión y se guarda vacía inmediatamen
 - `/lagrange` — `/lagrange ?` — polinomio interpolador por el método de Lagrange (bases `L_i(x)` + suma ponderada)
 - `/newton` — `/newton ?` — polinomio interpolador por diferencias divididas (tabla completa + forma de Newton)
 - `/factorizar` — `/factorizar ?` — factorización de enteros (`/factorizar 120`), polinomios o expresiones racionales (`/factorizar p1`), con factorización del numerador y del denominador y cancelación de factores comunes
+- `/factorizar -cuadrado` — completa el cuadrado de una cuadrática univariada y muestra el vértice
 - `/desarrollar` — `/desarrollar ?` — desarrollo de productos notables y potencias enteras de sumas
 - `/potencia` — `/potencia ?` — simplificación exacta de productos, cocientes y potencias de una expresión o función
 - `/radical` — `/radical ?` — simplificación exacta de raíces y exponentes fraccionarios de una expresión o función
+- `/radicalizar` — `/radicalizar ?` — racionalización por conjugado de fracciones con binomios de raíces cuadradas
 - `/limpiar` — `/limpiar` — comando global: borra objetos, historial, salida, inputs y undo/redo de la sesión actual (confirmación `s/N`)
 
 Ambos métodos de interpolación producen el mismo polinomio único de grado ≤ n para n+1 puntos.

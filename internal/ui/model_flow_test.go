@@ -347,6 +347,85 @@ func TestPotenciaYRadicalFlujo(t *testing.T) {
 	}
 }
 
+func TestRadicalizarFlujo(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/expresion sqrt(10)/(sqrt(5)-2)")
+	m.handleEnter()
+	if _, ok := m.objs["p1"]; !ok {
+		t.Fatal("la expresión no se declaró")
+	}
+	m.cmdInput.SetValue("/radicalizar p1")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("radicalizar debe lanzar un comando")
+	}
+	res := mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("radicalizar falló: %v", res.Err)
+	}
+	all := strings.Join(res.Steps, " ")
+	for _, frag := range []string{
+		"radicalización por conjugado",
+		"Conjugado del denominador: sqrt(5) + 2",
+		"Resultado: 5*sqrt(2) + 2*sqrt(10)",
+	} {
+		if !strings.Contains(all, frag) {
+			t.Fatalf("falta %q en: %v", frag, res.Steps)
+		}
+	}
+
+	// El comando completo sin argumentos no debe confundirse con /radical
+	// ni insertar una plantilla con "?".
+	m.cmdInput.SetValue("/radicalizar")
+	cmd = m.handleEnter()
+	if cmd == nil {
+		t.Fatal("/radicalizar debe ejecutarse sin argumentos")
+	}
+	res = mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("/radicalizar sin argumentos falló: %v", res.Err)
+	}
+}
+
+func TestFactorizarCuadradoFlujo(t *testing.T) {
+	m := newFlowModel()
+	m.declInput.SetValue("/expresion 2x^2-12x+11")
+	m.handleEnter()
+	if _, ok := m.objs["p1"]; !ok {
+		t.Fatal("la expresión no se declaró")
+	}
+	m.cmdInput.SetValue("/factorizar p1 -cuadrado")
+	cmd := m.handleEnter()
+	if cmd == nil {
+		t.Fatal("factorizar -cuadrado debe lanzar un comando")
+	}
+	res := mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("factorizar -cuadrado falló: %v", res.Err)
+	}
+	all := strings.Join(res.Steps, " ")
+	for _, frag := range []string{
+		"completar el cuadrado",
+		"Forma completada: 2*(x - 3)^2 - 7",
+		"Vértice (h, k): (3, -7)",
+	} {
+		if !strings.Contains(all, frag) {
+			t.Fatalf("falta %q en: %v", frag, res.Steps)
+		}
+	}
+
+	// La bandera sola también debe ejecutar sobre el último objeto.
+	m.cmdInput.SetValue("/factorizar -cuadrado")
+	cmd = m.handleEnter()
+	if cmd == nil {
+		t.Fatal("factorizar -cuadrado sin objeto debe lanzar un comando")
+	}
+	res = mustResultMsg(t, cmd)
+	if res.Err != nil {
+		t.Fatalf("factorizar -cuadrado sin objeto falló: %v", res.Err)
+	}
+}
+
 func TestDesarrollarFlujo(t *testing.T) {
 	m := newFlowModel()
 	m.declInput.SetValue("/expresion (a+b)^2")

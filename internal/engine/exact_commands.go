@@ -27,6 +27,12 @@ func Radical(e Expr) (ExactResult, error) {
 	return simplifyExact(e, "radical")
 }
 
+// Radicalizar racionaliza fracciones con binomios que contienen raíces
+// cuadradas. Es una operación independiente de /radical.
+func Radicalizar(e Expr) (ExactResult, error) {
+	return radicalizarExpr(e)
+}
+
 // Desarrollar expande productos y potencias enteras de sumas, mostrando la
 // fórmula del producto notable cuando se reconoce.
 func Desarrollar(e Expr) (ExactResult, error) {
@@ -237,6 +243,18 @@ func evalRadical(decl Decl) ([]string, error) {
 	res, err := Radical(e)
 	if err != nil {
 		return nil, fmt.Errorf("radical: %w", err)
+	}
+	return res.Steps, nil
+}
+
+func evalRadicalizar(decl Decl) ([]string, error) {
+	e, err := exactDeclExpr(decl, "radicalizar")
+	if err != nil {
+		return nil, err
+	}
+	res, err := Radicalizar(e)
+	if err != nil {
+		return nil, fmt.Errorf("radicalizar: %w", err)
 	}
 	return res.Steps, nil
 }

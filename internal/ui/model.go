@@ -105,7 +105,7 @@ func NewModel() Model {
 	declTi.Focus()
 
 	cmdTi := textinput.New()
-	cmdTi.Placeholder = "ej. /lagrange t1, /potencia, /radical"
+	cmdTi.Placeholder = "ej. /lagrange t1, /potencia, /radicalizar"
 	cmdTi.Prompt = "❯ "
 	cmdTi.CharLimit = 200
 
@@ -137,7 +137,7 @@ func welcomeLog() []LogEntry {
 	return []LogEntry{
 		{Level: LevelInfo, Content: "Bienvenido a TUnIversalCalc"},
 		{Level: LevelInfo, Content: "1. Declara un entero o un objeto: 120, /puntos (1,2) (3,4), /funcion 2x+2"},
-		{Level: LevelInfo, Content: "2. Opera por nombre o sobre el último objeto: /lagrange t1, /newton, /potencia, /radical"},
+		{Level: LevelInfo, Content: "2. Opera por nombre o sobre el último objeto: /lagrange t1, /newton, /potencia, /radical, /radicalizar"},
 		{Level: LevelInfo, Content: "Atajos: Ctrl+H ayuda · Ctrl+Z/Y undo · Ctrl+S guardar · Ctrl+L limpiar · /limpiar"},
 	}
 }
